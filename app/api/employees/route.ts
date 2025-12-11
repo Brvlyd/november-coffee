@@ -25,32 +25,55 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { employee_id, name, role, password } = body;
+    const { employee_id, full_name, position, employment_status, email, password } = body;
 
-    if (!employee_id || !name || !role || !password) {
+    if (!employee_id || !full_name || !position || !password) {
       return NextResponse.json(
-        { error: 'Semua field harus diisi' },
+        { error: 'ID Karyawan, Nama, Posisi, dan Password harus diisi' },
         { status: 400 }
       );
     }
 
     // Check if employee_id already exists
-    const { data: existing } = await supabase
+    const { data: existingId } = await supabase
       .from('employees')
       .select('employee_id')
       .eq('employee_id', employee_id)
       .single();
 
-    if (existing) {
+    if (existingId) {
       return NextResponse.json(
         { error: 'ID Karyawan sudah digunakan' },
         { status: 400 }
       );
     }
 
+    // Check if email already exists
+    if (email) {
+      const { data: existing } = await supabase
+        .from('employees')
+        .select('email')
+        .eq('email', email)
+        .single();
+
+      if (existing) {
+        return NextResponse.json(
+          { error: 'Email sudah digunakan' },
+          { status: 400 }
+        );
+      }
+    }
+
     const { data, error } = await supabase
       .from('employees')
-      .insert({ employee_id, name, role, password })
+      .insert({ 
+        employee_id,
+        full_name, 
+        position, 
+        employment_status: employment_status || 'Aktif',
+        email: email || null,
+        password
+      })
       .select()
       .single();
 
@@ -70,31 +93,56 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, employee_id, name, role, password } = body;
+    const { id, employee_id, full_name, position, employment_status, email, password } = body;
 
-    if (!id || !employee_id || !name || !role) {
+    if (!id || !employee_id || !full_name || !position) {
       return NextResponse.json(
-        { error: 'Field yang diperlukan tidak lengkap' },
+        { error: 'ID, ID Karyawan, Nama, dan Posisi harus diisi' },
         { status: 400 }
       );
     }
 
     // Check if employee_id is used by another employee
-    const { data: existing } = await supabase
+    const { data: existingId } = await supabase
       .from('employees')
       .select('id, employee_id')
       .eq('employee_id', employee_id)
       .neq('id', id)
       .single();
 
-    if (existing) {
+    if (existingId) {
       return NextResponse.json(
         { error: 'ID Karyawan sudah digunakan oleh karyawan lain' },
         { status: 400 }
       );
     }
 
-    const updateData: any = { employee_id, name, role };
+    // Check if email is used by another employee
+    if (email) {
+      const { data: existing } = await supabase
+        .from('employees')
+        .select('id, email')
+        .eq('email', email)
+        .neq('id', id)
+        .single();
+
+      if (existing) {
+        return NextResponse.json(
+          { error: 'Email sudah digunakan oleh karyawan lain' },
+          { status: 400 }
+        );
+      }
+    }
+
+    const updateData: any = { 
+      employee_id,
+      full_name, 
+      position, 
+      employment_status: employment_status || 'Aktif',
+      email: email || null
+    };
+
+    // Only update password if provided
     if (password) {
       updateData.password = password;
     }

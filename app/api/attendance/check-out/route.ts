@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get employee
+    // Get employee by employee_id
     const { data: employee, error: employeeError } = await supabase
       .from('employees')
       .select('id')

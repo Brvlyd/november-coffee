@@ -57,7 +57,7 @@ export default function AdminLayout({
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex">
+    <div className="h-screen bg-gray-100 flex overflow-hidden" suppressHydrationWarning>
       {/* Mobile Menu Button */}
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -75,25 +75,29 @@ export default function AdminLayout({
       )}
 
       {/* Sidebar */}
-      <motion.aside
-        initial={false}
-        animate={{
-          x: isSidebarOpen ? 0 : '-100%',
-        }}
-        className="fixed lg:static top-0 left-0 h-full w-64 bg-[#C84B31] z-40 lg:translate-x-0 flex flex-col"
+      <aside
+        className={`fixed lg:static top-0 left-0 h-screen w-72 bg-gradient-to-b from-[#C84B31] to-[#A03920] z-40 flex flex-col transition-transform duration-300 shadow-2xl ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
       >
-        {/* Logo */}
-        <div className="p-6 flex items-center gap-3">
-          <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-[#C84B31] font-bold text-xs leading-tight">Nov.</div>
-              <div className="text-[#C84B31] font-bold text-xs leading-tight">Coffee</div>
+        {/* Logo Section */}
+        <div className="p-6 border-b border-white/10">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform">
+              <div className="text-center">
+                <div className="text-[#C84B31] font-bold text-sm leading-tight">Nov.</div>
+                <div className="text-[#C84B31] font-bold text-sm leading-tight">Coffee</div>
+              </div>
+            </div>
+            <div>
+              <h1 className="text-white font-bold text-xl">November</h1>
+              <p className="text-white/70 text-sm">Admin Panel</p>
             </div>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 space-y-2">
+        <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
@@ -104,34 +108,38 @@ export default function AdminLayout({
                 href={item.href}
                 onClick={() => setIsSidebarOpen(false)}
                 className={`
-                  flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-white
+                  group flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-200
                   ${isActive 
-                    ? 'bg-white/20 font-semibold' 
-                    : 'hover:bg-white/10'
+                    ? 'bg-white text-[#C84B31] shadow-lg font-semibold scale-[1.02]' 
+                    : 'text-white hover:bg-white/15 hover:translate-x-1'
                   }
                 `}
               >
-                <Icon className="w-5 h-5" />
-                <span>{item.label}</span>
+                <Icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? 'text-[#C84B31]' : 'text-white/90'}`} />
+                <span className="text-[15px]">{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Logout Button */}
-        <div className="p-4">
+        {/* User Info & Logout */}
+        <div className="p-4 border-t border-white/10 mt-auto">
+          <div className="mb-3 px-4 py-2.5 bg-white/10 rounded-xl backdrop-blur-sm">
+            <p className="text-white font-semibold text-sm">Admin</p>
+            <p className="text-white/60 text-xs mt-0.5">Administrator</p>
+          </div>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-4 py-3 text-white hover:bg-white/10 rounded-lg transition-all"
+            className="flex items-center justify-center gap-3 w-full px-4 py-3 text-white bg-white/10 hover:bg-white/20 rounded-xl transition-all duration-200 group hover:scale-[1.02] active:scale-[0.98]"
           >
-            <LogOut className="w-5 h-5" />
-            <span>Logout</span>
+            <LogOut className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+            <span className="font-medium">Logout</span>
           </button>
         </div>
-      </motion.aside>
+      </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 h-screen overflow-auto">
         {children}
       </main>
     </div>

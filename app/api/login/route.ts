@@ -6,6 +6,8 @@ export async function POST(request: NextRequest) {
   try {
     const { employeeId, password } = await request.json();
 
+    console.log('Login attempt:', { employeeId, password: password ? '***' : 'empty' });
+
     if (!employeeId || !password) {
       return NextResponse.json(
         { error: 'ID Karyawan dan Password harus diisi' },
@@ -21,22 +23,26 @@ export async function POST(request: NextRequest) {
       .eq('password', password)
       .single();
 
+    console.log('Query result:', { employee: employee ? 'found' : 'not found', error: employeeError?.message });
+
     if (employeeError || !employee) {
+      console.error('Login failed:', employeeError);
       return NextResponse.json(
         { error: 'ID Karyawan atau Password salah' },
         { status: 401 }
       );
     }
 
-    // Check if admin
-    if (employee.role === 'admin') {
+    // Check if admin based on position
+    if (employee.position === 'admin' || employee.position === 'Admin') {
       return NextResponse.json({
         success: true,
         role: 'admin',
         employee: {
           id: employee.id,
-          name: employee.name,
-          role: employee.role,
+          name: employee.full_name,
+          position: employee.position,
+          email: employee.email,
         }
       });
     }
@@ -67,6 +73,7 @@ export async function POST(request: NextRequest) {
         employee_id: employee.id,
         date: today,
         check_in_at: checkInTime.toISOString(),
+        status: 'Hadir',
       })
       .select()
       .single();
@@ -81,12 +88,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      role: employee.role,
-      employeeName: employee.name,
+      role: 'employee',
+      employeeName: employee.full_name,
       employee: {
         id: employee.id,
-        name: employee.name,
-        role: employee.role,
+        name: employee.full_name,
+        position: employee.position,
+        email: employee.email,
       },
       checkInTime: formatTime(checkInTime),
       attendance

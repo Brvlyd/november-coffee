@@ -8,9 +8,10 @@ import { toast } from 'react-hot-toast';
 interface Employee {
   id: string;
   employee_id: string;
-  name: string;
-  phone: string;
-  role: string;
+  full_name: string;
+  position: string;
+  employment_status: string;
+  email: string;
   password: string;
   created_at: string;
 }
@@ -24,10 +25,11 @@ export default function EmployeesPage() {
   
   const [formData, setFormData] = React.useState({
     employee_id: '',
-    name: '',
-    phone: '',
+    full_name: '',
+    position: '',
+    employment_status: 'Active',
+    email: '',
     password: '',
-    role: 'employee',
   });
 
   React.useEffect(() => {
@@ -40,7 +42,7 @@ export default function EmployeesPage() {
       const result = await response.json();
       
       if (response.ok) {
-        setEmployees(result.data.filter((emp: Employee) => emp.role !== 'admin'));
+        setEmployees(result.data.filter((emp: Employee) => emp.position !== 'Admin'));
       } else {
         toast.error(result.error);
       }
@@ -54,7 +56,7 @@ export default function EmployeesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.employee_id) {
+    if (!formData.full_name || !formData.employee_id) {
       toast.error('Nama dan ID Karyawan harus diisi');
       return;
     }
@@ -112,10 +114,11 @@ export default function EmployeesPage() {
       setEditingEmployee(employee);
       setFormData({
         employee_id: employee.employee_id,
-        name: employee.name,
-        phone: employee.phone,
+        full_name: employee.full_name,
+        position: employee.position,
+        employment_status: employee.employment_status,
+        email: employee.email,
         password: '',
-        role: employee.role,
       });
     }
     setIsModalOpen(true);
@@ -126,16 +129,18 @@ export default function EmployeesPage() {
     setEditingEmployee(null);
     setFormData({
       employee_id: '',
-      name: '',
-      phone: '',
+      full_name: '',
+      position: '',
+      employment_status: 'Active',
+      email: '',
       password: '',
-      role: 'employee',
     });
   };
 
   const filteredEmployees = employees.filter(emp =>
-    emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.employee_id.toLowerCase().includes(searchTerm.toLowerCase())
+    emp.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.employee_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.position?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -196,9 +201,10 @@ export default function EmployeesPage() {
 
             {/* Info */}
             <div className="text-center mb-4">
-              <h3 className="text-lg font-bold text-gray-900 mb-1">{employee.name}</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">{employee.full_name}</h3>
               <p className="text-sm text-gray-600 mb-2">{employee.employee_id}</p>
-              <p className="text-sm text-gray-500">{employee.phone || 'No phone'}</p>
+              <p className="text-sm text-[#C84B31] font-medium mb-1">{employee.position}</p>
+              <p className="text-sm text-gray-500">{employee.email || 'No email'}</p>
             </div>
 
             {/* Actions */}
@@ -268,22 +274,53 @@ export default function EmployeesPage() {
                   </label>
                   <input
                     type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31]"
+                    value={formData.full_name}
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900"
                     required
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    No. Telepon
+                    Posisi
                   </label>
                   <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31]"
+                    type="text"
+                    value={formData.position}
+                    onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900"
+                    placeholder="e.g., Barista, Cashier"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status Karyawan
+                  </label>
+                  <select
+                    value={formData.employment_status}
+                    onChange={(e) => setFormData({ ...formData, employment_status: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900"
+                    required
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                    <option value="On Leave">On Leave</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900"
+                    required
                   />
                 </div>
 
@@ -295,7 +332,7 @@ export default function EmployeesPage() {
                     type="password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900"
                     required={!editingEmployee}
                   />
                 </div>
