@@ -1,0 +1,149 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
+
+// GET all employees
+export async function GET() {
+  try {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    return NextResponse.json({ data });
+  } catch (error) {
+    console.error('Error fetching employees:', error);
+    return NextResponse.json(
+      { error: 'Gagal mengambil data karyawan' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST new employee
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { employee_id, name, role, password } = body;
+
+    if (!employee_id || !name || !role || !password) {
+      return NextResponse.json(
+        { error: 'Semua field harus diisi' },
+        { status: 400 }
+      );
+    }
+
+    // Check if employee_id already exists
+    const { data: existing } = await supabase
+      .from('employees')
+      .select('employee_id')
+      .eq('employee_id', employee_id)
+      .single();
+
+    if (existing) {
+      return NextResponse.json(
+        { error: 'ID Karyawan sudah digunakan' },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from('employees')
+      .insert({ employee_id, name, role, password })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json({ data }, { status: 201 });
+  } catch (error) {
+    console.error('Error creating employee:', error);
+    return NextResponse.json(
+      { error: 'Gagal menambahkan karyawan' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT update employee
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, employee_id, name, role, password } = body;
+
+    if (!id || !employee_id || !name || !role) {
+      return NextResponse.json(
+        { error: 'Field yang diperlukan tidak lengkap' },
+        { status: 400 }
+      );
+    }
+
+    // Check if employee_id is used by another employee
+    const { data: existing } = await supabase
+      .from('employees')
+      .select('id, employee_id')
+      .eq('employee_id', employee_id)
+      .neq('id', id)
+      .single();
+
+    if (existing) {
+      return NextResponse.json(
+        { error: 'ID Karyawan sudah digunakan oleh karyawan lain' },
+        { status: 400 }
+      );
+    }
+
+    const updateData: any = { employee_id, name, role };
+    if (password) {
+      updateData.password = password;
+    }
+
+    const { data, error } = await supabase
+      .from('employees')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json({ data });
+  } catch (error) {
+    console.error('Error updating employee:', error);
+    return NextResponse.json(
+      { error: 'Gagal mengupdate karyawan' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE employee
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'ID diperlukan' },
+        { status: 400 }
+      );
+    }
+
+    const { error } = await supabase
+      .from('employees')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting employee:', error);
+    return NextResponse.json(
+      { error: 'Gagal menghapus karyawan' },
+      { status: 500 }
+    );
+  }
+}
