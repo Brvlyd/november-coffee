@@ -174,7 +174,7 @@ export default function InventoriPage() {
             placeholder="Cari barang..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] focus:border-transparent text-gray-900 font-medium placeholder:text-gray-400"
           />
         </div>
       </div>
@@ -259,51 +259,51 @@ export default function InventoriPage() {
 
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Nama Barang
                   </label>
                   <input
                     type="text"
                     value={formData.nama_barang}
                     onChange={(e) => setFormData({ ...formData, nama_barang: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900 font-medium placeholder:text-gray-400"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Kategori
                   </label>
                   <input
                     type="text"
                     value={formData.kategori}
                     onChange={(e) => setFormData({ ...formData, kategori: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900 font-medium placeholder:text-gray-400"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Jumlah
                   </label>
                   <input
                     type="number"
                     value={formData.jumlah}
                     onChange={(e) => setFormData({ ...formData, jumlah: parseInt(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900 font-medium"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Catatan
                   </label>
                   <textarea
                     value={formData.catatan}
                     onChange={(e) => setFormData({ ...formData, catatan: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900 font-medium placeholder:text-gray-400"
                     rows={3}
                   />
                 </div>
@@ -312,13 +312,13 @@ export default function InventoriPage() {
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-semibold text-gray-700"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 bg-[#C84B31] text-white px-4 py-2 rounded-lg hover:bg-[#A03B24] transition-colors"
+                    className="flex-1 bg-[#C84B31] text-white px-4 py-2 rounded-lg hover:bg-[#A03B24] transition-colors font-semibold"
                   >
                     {editingItem ? 'Update' : 'Tambah'}
                   </button>

@@ -157,11 +157,11 @@ export default function EmployeesPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Daftar Karyawan</h1>
-          <p className="text-gray-600">Kelola data karyawan November Coffee</p>
+          <p className="text-gray-600 font-medium">Kelola data karyawan November Coffee</p>
         </div>
         <button
           onClick={() => openModal()}
-          className="flex items-center gap-2 bg-[#C84B31] text-white px-6 py-3 rounded-lg hover:bg-[#A03B24] transition-colors"
+          className="flex items-center gap-2 bg-[#C84B31] text-white px-6 py-3 rounded-lg hover:bg-[#A03B24] transition-colors font-semibold"
         >
           <Plus className="w-5 h-5" />
           Tambah Karyawan
@@ -177,7 +177,7 @@ export default function EmployeesPage() {
             placeholder="Cari karyawan..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] focus:border-transparent text-gray-900 font-medium placeholder:text-gray-400"
           />
         </div>
       </div>
@@ -202,23 +202,23 @@ export default function EmployeesPage() {
             {/* Info */}
             <div className="text-center mb-4">
               <h3 className="text-lg font-bold text-gray-900 mb-1">{employee.full_name}</h3>
-              <p className="text-sm text-gray-600 mb-2">{employee.employee_id}</p>
-              <p className="text-sm text-[#C84B31] font-medium mb-1">{employee.position}</p>
-              <p className="text-sm text-gray-500">{employee.email || 'No email'}</p>
+              <p className="text-sm text-gray-600 mb-2 font-medium">{employee.employee_id}</p>
+              <p className="text-sm text-[#C84B31] font-semibold mb-1">{employee.position}</p>
+              <p className="text-sm text-gray-500 font-medium">{employee.email || 'No email'}</p>
             </div>
 
             {/* Actions */}
             <div className="flex gap-2">
               <button
                 onClick={() => openModal(employee)}
-                className="flex-1 flex items-center justify-center gap-2 bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 transition-colors font-semibold"
               >
                 <Edit className="w-4 h-4" />
                 Edit
               </button>
               <button
                 onClick={() => handleDelete(employee.id)}
-                className="flex-1 flex items-center justify-center gap-2 bg-red-50 text-red-600 py-2 rounded-lg hover:bg-red-100 transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 bg-red-50 text-red-600 py-2 rounded-lg hover:bg-red-100 transition-colors font-semibold"
               >
                 <Trash2 className="w-4 h-4" />
                 Hapus
@@ -255,54 +255,54 @@ export default function EmployeesPage() {
 
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     ID Karyawan
                   </label>
                   <input
                     type="text"
                     value={formData.employee_id}
                     onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31]"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900 font-medium"
                     required
                     disabled={!!editingEmployee}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Nama Lengkap
                   </label>
                   <input
                     type="text"
                     value={formData.full_name}
                     onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900 font-medium placeholder:text-gray-400"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Posisi
                   </label>
                   <input
                     type="text"
                     value={formData.position}
                     onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900 font-medium placeholder:text-gray-400"
                     placeholder="e.g., Barista, Cashier"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Status Karyawan
                   </label>
                   <select
                     value={formData.employment_status}
                     onChange={(e) => setFormData({ ...formData, employment_status: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900 font-medium"
                     required
                   >
                     <option value="Active">Active</option>
@@ -312,27 +312,27 @@ export default function EmployeesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Email
                   </label>
                   <input
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900 font-medium placeholder:text-gray-400"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
                     {editingEmployee ? 'Password Baru (kosongkan jika tidak diubah)' : 'Password'}
                   </label>
                   <input
                     type="password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900 font-medium"
                     required={!editingEmployee}
                   />
                 </div>
@@ -341,13 +341,13 @@ export default function EmployeesPage() {
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-semibold text-gray-700"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 bg-[#C84B31] text-white px-4 py-2 rounded-lg hover:bg-[#A03B24] transition-colors"
+                    className="flex-1 bg-[#C84B31] text-white px-4 py-2 rounded-lg hover:bg-[#A03B24] transition-colors font-semibold"
                   >
                     {editingEmployee ? 'Update' : 'Tambah'}
                   </button>

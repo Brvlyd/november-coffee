@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
         *,
         employees:employee_id (
           employee_id,
-          name,
-          role
+          full_name,
+          position
         )
       `)
       .order('date', { ascending: false })

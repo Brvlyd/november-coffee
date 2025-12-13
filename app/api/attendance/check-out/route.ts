@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { getCurrentShift } from '@/lib/shift';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,29 +27,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get active shift (checked in but not checked out) for current shift
     const today = new Date().toISOString().split('T')[0];
+    const currentShift = getCurrentShift();
 
-    // Get today's attendance
-    const { data: attendance, error: attendanceError } = await supabase
+    const { data: activeShifts, error: shiftError } = await supabase
       .from('attendance')
       .select('*')
       .eq('employee_id', employee.id)
       .eq('date', today)
-      .single();
+      .eq('shift_id', currentShift.id)
+      .is('check_out_at', null)
+      .limit(1);
 
-    if (attendanceError || !attendance) {
+    if (shiftError) {
+      console.error('Error getting active shift:', shiftError);
       return NextResponse.json(
-        { error: 'Anda belum check-in hari ini' },
+        { error: 'Gagal memeriksa shift aktif' },
+        { status: 500 }
+      );
+    }
+
+    if (!activeShifts || activeShifts.length === 0) {
+      return NextResponse.json(
+        { 
+          error: `Anda tidak memiliki shift aktif untuk ${currentShift.name}. Silakan check-in terlebih dahulu.`,
+          shift: currentShift
+        },
         { status: 400 }
       );
     }
 
-    if (attendance.check_out_at) {
-      return NextResponse.json(
-        { error: 'Anda sudah check-out hari ini' },
-        { status: 400 }
-      );
-    }
+    const attendance = activeShifts[0];
 
     // Update check-out time
     const checkOutTime = new Date();

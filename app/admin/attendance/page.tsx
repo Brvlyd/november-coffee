@@ -36,7 +36,19 @@ export default function AttendancePage() {
       const result = await response.json();
       
       if (response.ok) {
-        setAttendance(result.data);
+        // Transform data to match interface
+        const transformedData = result.data.map((record: any) => ({
+          id: record.id,
+          employee_id: record.employees?.employee_id || record.employee_id,
+          employee_name: record.employees?.full_name || 'Unknown',
+          date: record.date,
+          check_in_at: record.check_in_at,
+          check_out_at: record.check_out_at,
+          duration: record.check_out_at 
+            ? calculateDuration(new Date(record.check_in_at), new Date(record.check_out_at))
+            : null
+        }));
+        setAttendance(transformedData);
       } else {
         toast.error(result.error);
       }
@@ -78,8 +90,8 @@ export default function AttendancePage() {
   };
 
   const filteredAttendance = attendance.filter(record =>
-    record.employee_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.employee_id.toLowerCase().includes(searchTerm.toLowerCase())
+    record.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    record.employee_id?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getStatusBadge = (checkOut: string | null) => {

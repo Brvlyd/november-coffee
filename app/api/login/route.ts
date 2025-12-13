@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         role: 'admin',
+        employeeId: employee.employee_id,
         employee: {
           id: employee.id,
           name: employee.full_name,
@@ -47,57 +48,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // For regular employees, handle check-in
-    const today = new Date().toISOString().split('T')[0];
-
-    // Check if already checked in today
-    const { data: existingAttendance } = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('employee_id', employee.id)
-      .eq('date', today)
-      .single();
-
-    if (existingAttendance && existingAttendance.check_in_at) {
-      return NextResponse.json(
-        { error: 'Anda sudah check-in hari ini' },
-        { status: 400 }
-      );
-    }
-
-    // Create check-in record
-    const checkInTime = new Date();
-    const { data: attendance, error: attendanceError } = await supabase
-      .from('attendance')
-      .insert({
-        employee_id: employee.id,
-        date: today,
-        check_in_at: checkInTime.toISOString(),
-        status: 'Hadir',
-      })
-      .select()
-      .single();
-
-    if (attendanceError) {
-      console.error('Attendance error:', attendanceError);
-      return NextResponse.json(
-        { error: 'Gagal mencatat check-in' },
-        { status: 500 }
-      );
-    }
-
+    // For regular employees, just authenticate (no auto check-in)
     return NextResponse.json({
       success: true,
       role: 'employee',
+      employeeId: employee.employee_id,
       employeeName: employee.full_name,
       employee: {
         id: employee.id,
         name: employee.full_name,
         position: employee.position,
         email: employee.email,
-      },
-      checkInTime: formatTime(checkInTime),
-      attendance
+      }
     });
 
   } catch (error) {

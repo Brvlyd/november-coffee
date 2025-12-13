@@ -22,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="id">
       <body
-        className={`${spartan.variable} font-sans antialiased`}
+        className={`${spartan.variable} font-spartan antialiased`}
         suppressHydrationWarning
       >
         {children}
