@@ -12,15 +12,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prepare FormData for OCR.space API
+    // Prepare FormData for OCR.space API dengan optimasi untuk nota Indonesia
     const ocrFormData = new FormData();
     ocrFormData.append('file', file);
-    ocrFormData.append('language', 'eng');
+    ocrFormData.append('language', 'eng'); // English untuk deteksi angka dan teks campuran
     ocrFormData.append('isOverlayRequired', 'false');
     ocrFormData.append('detectOrientation', 'true');
     ocrFormData.append('scale', 'true');
     ocrFormData.append('OCREngine', '2'); // Engine 2 is better for complex images
-    ocrFormData.append('isTable', 'true'); // Enable receipt scanning mode for better accuracy
+    ocrFormData.append('isTable', 'true'); // Enable table detection for structured receipts
+    ocrFormData.append('filetype', 'Auto'); // Auto-detect file type
+    ocrFormData.append('detectCheckbox', 'false'); // Speed up processing
 
     // Call OCR.space API
     const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
@@ -68,25 +70,43 @@ function parseNotaText(text: string) {
   let tanggal = '';
   let total = '';
 
-  // Extract supplier (usually first few lines) - improved detection
-  const supplierKeywords = ['toko', 'store', 'supplier', 'cv', 'pt', 'ud', 'distributor'];
-  for (let i = 0; i < Math.min(5, lines.length); i++) {
+  // Extract supplier dengan prioritas multi-level
+  const supplierKeywords = ['toko', 'store', 'supplier', 'cv', 'pt', 'ud', 'distributor', 'warung', 'swalayan'];
+  
+  // LEVEL 1: Cari line yang punya kata kunci supplier (prioritas tertinggi)
+  for (let i = 0; i < Math.min(15, lines.length); i++) {
     const line = lines[i];
-    // Skip lines that are clearly dates, totals, or too short
-    if (line.length < 3 || 
-        /\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}/.test(line) ||
-        /total|jumlah|nota|invoice|tanggal/i.test(line)) {
-      continue;
+    const lowerLine = line.toLowerCase();
+    
+    // Cek apakah ada keyword supplier
+    if (supplierKeywords.some(kw => lowerLine.includes(kw))) {
+      const extracted = extractStoreName(line);
+      // Validasi: harus ada huruf dan panjang wajar
+      if (extracted && extracted.length >= 3 && extracted.length <= 60 && /[a-zA-Z]{3,}/.test(extracted)) {
+        supplier = extracted;
+        break;
+      }
     }
-    // Check if line contains supplier keywords OR is first substantial line
-    if (supplierKeywords.some(kw => line.toLowerCase().includes(kw)) || 
-        (i === 0 && line.length > 3)) {
-      supplier = extractStoreName(line);
-      break;
-    }
-    // If no keyword match, use first non-date, non-total line
-    if (!supplier && i < 3 && line.length > 3) {
-      supplier = extractStoreName(line);
+  }
+  
+  // LEVEL 2: Jika belum ketemu, ambil baris pertama yang substantial
+  if (!supplier) {
+    for (let i = 0; i < Math.min(5, lines.length); i++) {
+      const line = lines[i];
+      // Skip jika jelas bukan nama toko
+      if (line.length < 3 || line.length > 60 ||
+          /\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}/.test(line) ||
+          /^(nota|invoice|receipt|tanggal|date|no\.)/i.test(line) ||
+          /total|jumlah|bayar|tunai/i.test(line) ||
+          /^\d+$/.test(line)) {
+        continue;
+      }
+      
+      // Harus mengandung huruf yang cukup
+      if (/[a-zA-Z]{3,}/.test(line)) {
+        supplier = extractStoreName(line);
+        if (supplier && supplier.length >= 3) break;
+      }
     }
   }
 
@@ -112,49 +132,67 @@ function parseNotaText(text: string) {
     }
   }
 
-  // Expanded coffee shop items untuk smart matching - prioritas tinggi
+  // Daftar lengkap item coffee shop dengan prioritas dan kategori
   const coffeeShopItems = [
-    // Kopi & Biji Kopi
-    'kopi', 'coffee', 'arabica', 'robusta', 'liberica', 'excelsa',
-    'espresso', 'latte', 'cappuccino', 'americano', 'macchiato', 'mocha',
-    'biji kopi', 'kopi bubuk', 'kopi instan', 'green bean', 'roasted',
+    // PRIORITAS SANGAT TINGGI - Item umum yang sering muncul
+    'kopi', 'coffee', 'susu', 'milk', 'gula', 'sugar', 'teh', 'tea',
+    'cup', 'gelas', 'aqua', 'air',
     
-    // Susu & Dairy
-    'susu', 'milk', 'uht', 'fresh milk', 'full cream', 'skim milk',
-    'cream', 'creamer', 'whipping cream', 'condensed milk', 'evaporated',
-    'krim', 'krimer', 'susu cair', 'susu bubuk', 'dairy',
+    // Kopi & Turunannya
+    'arabica', 'robusta', 'liberica', 'excelsa', 'espresso', 'cappuccino',
+    'americano', 'macchiato', 'latte', 'mocha', 'frappe', 'lungo',
+    'biji kopi', 'kopi bubuk', 'kopi instan', 'green bean', 'roasted bean',
+    'kopi sangrai', 'kopi hijau',
+    
+    // Susu & Produk Dairy
+    'uht', 'fresh milk', 'full cream', 'low fat', 'skim milk',
+    'cream', 'creamer', 'krimer', 'krim', 'whipping cream', 'heavy cream',
+    'condensed milk', 'susu kental', 'evaporated', 'susu cair', 'susu bubuk',
+    'dairy', 'susu segar', 'susu pasteurisasi',
     
     // Gula & Pemanis
-    'gula', 'sugar', 'gula pasir', 'gula merah', 'brown sugar', 'palm sugar',
-    'madu', 'honey', 'stevia', 'sweetener', 'gula aren', 'raw sugar',
+    'gula pasir', 'gula merah', 'gula aren', 'brown sugar', 'white sugar',
+    'palm sugar', 'raw sugar', 'cane sugar', 'madu', 'honey', 'stevia',
+    'sweetener', 'gula jawa', 'gula batu',
     
-    // Teh & Minuman
-    'teh', 'tea', 'green tea', 'black tea', 'earl grey', 'chamomile',
-    'jasmine', 'oolong', 'matcha', 'hojicha', 'teh hijau', 'teh hitam',
+    // Teh & Varian
+    'matcha', 'green tea', 'teh hijau', 'black tea', 'teh hitam',
+    'earl grey', 'chamomile', 'jasmine', 'melati', 'oolong', 'hojicha',
+    'teh celup', 'tea bag', 'teh tubruk', 'teh manis',
     
-    // Sirup & Saus
-    'sirup', 'syrup', 'vanilla', 'caramel', 'hazelnut', 'chocolate',
-    'coklat', 'sauce', 'saus', 'palm', 'monin', 'torani',
+    // Sirup & Flavor
+    'sirup', 'syrup', 'vanilla', 'vanila', 'caramel', 'karamel',
+    'hazelnut', 'chocolate', 'coklat', 'strawberry', 'stroberi',
+    'sauce', 'saus', 'palm', 'monin', 'torani', 'peppermint',
+    'irish cream', 'butterscotch',
     
     // Powder & Bubuk
     'milo', 'ovaltine', 'bubuk', 'powder', 'chocolate powder',
-    'cocoa', 'choco', 'oreo', 'tiramisu', 'red velvet',
+    'cocoa', 'cokelat bubuk', 'choco', 'oreo', 'tiramisu',
+    'red velvet', 'taro', 'matcha powder', 'chai',
     
-    // Kemasan & Packaging
-    'cup', 'gelas', 'paper cup', 'plastic cup', 'hot cup', 'cold cup',
-    'sedotan', 'straw', 'paper straw', 'plastic straw',
-    'lid', 'tutup', 'dome lid', 'flat lid',
-    'box', 'paper bag', 'plastik', 'plastic', 'plastic bag',
-    'tissue', 'serbet', 'napkin', 'wrapper', 'packaging',
-    'sleeve', 'holder', 'carrier',
+    // Kemasan
+    'paper cup', 'plastic cup', 'hot cup', 'cold cup', 'foam cup',
+    'sedotan', 'straw', 'paper straw', 'plastic straw', 'bamboo straw',
+    'lid', 'tutup', 'dome lid', 'flat lid', 'sippy lid',
+    'box', 'paper bag', 'kantong', 'plastik', 'plastic bag',
+    'tissue', 'tisu', 'serbet', 'napkin', 'wrapper', 'packaging',
+    'sleeve', 'holder', 'carrier', 'cup holder',
     
     // Air & Minuman Lain
-    'air mineral', 'aqua', 'mineral water', 'air', 'water',
+    'air mineral', 'mineral water', 'aqua', 'ades', 'vit', 'le minerale',
+    'air minum', 'drinking water', 'sparkling', 'soda', 'sprite', 'coca cola', 'fanta',
     
     // Topping & Extras
-    'whipped cream', 'ice cream', 'es krim', 'topping',
-    'jelly', 'pudding', 'boba', 'pearl', 'cincau',
-    'almond', 'hazelnut', 'wafer', 'cookie', 'biscuit'
+    'whipped cream', 'whip cream', 'ice cream', 'es krim', 'topping',
+    'jelly', 'pudding', 'boba', 'bubble', 'pearl', 'tapioca',
+    'cincau', 'grass jelly', 'nata de coco', 'almond', 'wafer', 'cookie', 'biskuit',
+    'biscuit', 'marshmallow', 'sprinkles', 'meses', 'choco chips',
+    
+    // Brand-brand populer di Indonesia (untuk deteksi lebih akurat)
+    'indomilk', 'ultra', 'frisian flag', 'greenfields', 'diamond',
+    'abc', 'santos', 'kapal api', 'good day', 'nescafe', 'torabika',
+    'tropicana', 'minute maid', 'nestle', 'dancow'
   ];
 
   // Helper function to extract all numbers from a line - CLEAN numbers only
@@ -162,48 +200,133 @@ function parseNotaText(text: string) {
     // Match angka dengan atau tanpa Rp, titik ribuan, atau koma
     const matches = line.match(/(?:Rp[\s.]?)?([\d]{1,3}(?:[.,][\d]{3})*(?:[.,][\d]+)?)/gi);
     if (!matches) return [];
-    return matches.map(m => {
+    
+    const extractedNumbers: number[] = [];
+    
+    for (const m of matches) {
       // AGRESIF: Bersihkan SEMUA karakter non-numeric kecuali digit
       const cleaned = m.replace(/[^0-9]/g, '');
-      return parseFloat(cleaned);
-    }).filter(n => !isNaN(n) && n > 0);
+      const num = parseFloat(cleaned);
+      
+      if (isNaN(num) || num <= 0) continue;
+      
+      // DETEKSI angka gabungan: jika angka 5+ digit dan bisa dipecah jadi qty + harga
+      // Contoh: 12001 -> 2 dan 12000 atau 212000 -> 2 dan 12000
+      if (cleaned.length >= 5) {
+        // Coba pisahkan: 1-2 digit pertama sebagai qty, sisanya sebagai harga
+        for (let qtyLen = 1; qtyLen <= 2; qtyLen++) {
+          const potentialQty = parseInt(cleaned.substring(0, qtyLen));
+          const potentialPrice = parseInt(cleaned.substring(qtyLen));
+          
+          // Validasi: qty harus < 50 dan harga harus >= 1000 (harga wajar)
+          // Dan hasil perkalian harus masuk akal
+          if (potentialQty > 0 && potentialQty < 50 && 
+              potentialPrice >= 1000 && potentialPrice < 1000000) {
+            // Cek apakah ini likely gabungan: harga habis dibagi 1000 (kelipatan ribuan)
+            if (potentialPrice % 1000 === 0 || potentialPrice % 100 === 0) {
+              // Ini kemungkinan besar angka gabungan!
+              extractedNumbers.push(potentialQty);
+              extractedNumbers.push(potentialPrice);
+              // Jangan push angka asli, sudah dipecah
+              continue;
+            }
+          }
+        }
+      }
+      
+      // Jika tidak terdeteksi sebagai gabungan, push as-is
+      extractedNumbers.push(num);
+    }
+    
+    return extractedNumbers.filter(n => !isNaN(n) && n > 0);
   };
 
-  // Helper to determine which number is quantity vs price
+  // Helper untuk klasifikasi angka dengan logika yang lebih cerdas
   const classifyNumbers = (numbers: number[], satuan?: string, line?: string) => {
     if (numbers.length === 0) return {};
     
     // Sort dari kecil ke besar
     const sorted = [...numbers].sort((a, b) => a - b);
     
+    // Single number logic
     if (numbers.length === 1) {
-      // Single number: kalau < 100 kemungkinan jumlah, kalau >= 1000 kemungkinan harga total
-      return numbers[0] < 100 ? { jumlah: numbers[0] } : { harga_total: numbers[0] };
+      const num = numbers[0];
+      // Jika < 100, kemungkinan besar quantity
+      if (num < 100) return { jumlah: num };
+      // Jika 100-1000, bisa jadi qty atau harga satuan - default qty
+      if (num < 1000) return { jumlah: num };
+      // Jika >= 1000, kemungkinan harga total
+      return { harga_total: num };
     }
     
+    // Two numbers - ini yang paling tricky
     if (numbers.length === 2) {
-      // Two numbers: yang lebih kecil = jumlah, yang lebih besar = harga total
-      // Pastikan yang pertama memang jumlah (< 1000) dan yang kedua harga (>= 1000)
-      if (sorted[0] < 1000 && sorted[1] >= 1000) {
-        return { jumlah: sorted[0], harga_total: sorted[1] };
+      const small = sorted[0];
+      const large = sorted[1];
+      const ratio = large / small;
+      
+      // PRIORITAS 1: Angka kecil jelas qty (1-99) dan besar jelas harga (>= 5000)
+      if (small >= 1 && small <= 99 && large >= 5000) {
+        return { jumlah: small, harga_total: large };
       }
-      // Jika keduanya kecil, yang pertama jumlah, kedua mungkin harga satuan
-      if (sorted[0] < 100 && sorted[1] < 10000) {
-        return { jumlah: sorted[0], harga_satuan: sorted[1] };
+      
+      // PRIORITAS 2: Ratio sangat besar (>= 500) - pasti qty x total
+      if (ratio >= 500) {
+        return { jumlah: small, harga_total: large };
       }
-      // Default: yang kecil = jumlah, yang besar = total
-      return { jumlah: sorted[0], harga_total: sorted[1] };
+      
+      // PRIORITAS 3: Small reasonable qty (1-50) dan large reasonable price (>= 2000)
+      if (small >= 1 && small <= 50 && large >= 2000) {
+        return { jumlah: small, harga_total: large };
+      }
+      
+      // PRIORITAS 4: Cek apakah bisa dibagi dengan baik
+      // Jika large / small menghasilkan angka bulat ribuan, kemungkinan qty x total
+      if (small <= 100 && large % small === 0) {
+        const calculatedPrice = large / small;
+        // Harga per unit harus wajar (>= 500)
+        if (calculatedPrice >= 500) {
+          return { 
+            jumlah: small, 
+            harga_satuan: calculatedPrice,
+            harga_total: large 
+          };
+        }
+      }
+      
+      // PRIORITAS 5: Small < 100 dan large dalam range harga wajar
+      if (small < 100 && large >= 1000 && large <= 10000000) {
+        return { jumlah: small, harga_total: large };
+      }
+      
+      // PRIORITAS 6: Keduanya kecil - likely qty dan harga satuan
+      if (small < 100 && large < 10000) {
+        return { jumlah: small, harga_satuan: large };
+      }
+      
+      // FALLBACK: Default assignment dengan warning jika suspicious
+      if (small > 1000) {
+        console.warn(`⚠️ Suspicious number classification: ${small} vs ${large}`);
+      }
+      return { jumlah: small, harga_total: large };
     }
     
     if (numbers.length >= 3) {
-      // Three+ numbers: yang terkecil = jumlah, menengah = harga satuan, terbesar = harga total
-      // Filter: jumlah harus < 1000, harga satuan < harga total
+      // Three+ numbers: terkecil = jumlah, menengah = harga satuan, terbesar = harga total
       const potentialQty = sorted[0];
       const potentialUnitPrice = sorted[1];
       const potentialTotal = sorted[sorted.length - 1]; // ambil yang terbesar
       
-      // Validasi: jumlah harus masuk akal (< 1000) dan harga satuan < harga total
-      if (potentialQty < 1000 && potentialUnitPrice < potentialTotal) {
+      // VALIDASI KETAT:
+      // 1. Jumlah harus masuk akal (< 500 untuk quantity)
+      // 2. Harga satuan < harga total
+      // 3. Ratio total/qty harus sekitar harga satuan (validasi konsistensi)
+      const isQtyValid = potentialQty < 500;
+      const isPriceValid = potentialUnitPrice < potentialTotal;
+      const calculatedUnitPrice = potentialTotal / potentialQty;
+      const isConsistent = Math.abs(calculatedUnitPrice - potentialUnitPrice) / calculatedUnitPrice < 0.5; // Toleransi 50%
+      
+      if (isQtyValid && isPriceValid && (isConsistent || potentialUnitPrice * potentialQty === potentialTotal)) {
         return { 
           jumlah: potentialQty, 
           harga_satuan: potentialUnitPrice,
@@ -211,7 +334,17 @@ function parseNotaText(text: string) {
         };
       }
       
-      // Fallback: ambil 3 angka pertama setelah di-sort
+      // Fallback: coba tanpa middle number
+      if (isQtyValid && potentialTotal / potentialQty >= 1000) {
+        const calculatedPrice = Math.round(potentialTotal / potentialQty);
+        return {
+          jumlah: potentialQty,
+          harga_satuan: calculatedPrice,
+          harga_total: potentialTotal
+        };
+      }
+      
+      // Last resort: ambil 3 angka pertama setelah di-sort
       return { 
         jumlah: sorted[0], 
         harga_satuan: sorted[1],
@@ -222,26 +355,51 @@ function parseNotaText(text: string) {
     return { jumlah: sorted[0] };
   };
 
-  // Parse items with multiple pattern attempts - prioritize coffee shop items
-  for (const line of lines) {
-    // Skip obvious non-item lines
-    if (line === supplier || 
-        line.toLowerCase().includes('total') || 
-        line.toLowerCase().includes('subtotal') ||
-        line.toLowerCase().includes('grand total') ||
-        line.toLowerCase().includes('terima kasih') ||
-        line.toLowerCase().includes('thank you') ||
-        line.toLowerCase().includes('pembayaran') ||
-        line.toLowerCase().includes('kembalian') ||
-        line.toLowerCase().includes('tunai') ||
-        line.toLowerCase().includes('cash') ||
-        line.toLowerCase().includes('tanggal') ||
-        line.toLowerCase().includes('nota') ||
-        line.toLowerCase().includes('invoice') ||
-        /\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}/.test(line) || // Skip lines with dates
-        line.length < 3) {
-      continue;
+  // Helper: Validasi apakah line adalah item yang valid
+  const isValidItemLine = (line: string): boolean => {
+    const lower = line.toLowerCase();
+    
+    // Skip jika sama dengan supplier
+    if (line === supplier) return false;
+    
+    // Skip jika terlalu pendek (< 2 chars)
+    if (line.length < 2) return false;
+    
+    // Skip jika hanya angka
+    if (/^\d+$/.test(line)) return false;
+    
+    // Skip keywords yang jelas bukan item
+    const skipKeywords = [
+      'total', 'subtotal', 'grand total', 'jumlah', 'amount',
+      'terima kasih', 'thank you', 'thanks', 'terimakasih',
+      'pembayaran', 'payment', 'bayar', 'paid',
+      'kembalian', 'change', 'kembali',
+      'tunai', 'cash', 'debit', 'credit', 'transfer',
+      'tanggal', 'date', 'tgl',
+      'nota', 'invoice', 'receipt', 'bill', 'struk',
+      'no.', 'number', 'nomor',
+      'kasir', 'cashier', 'operator',
+      'alamat', 'address', 'telp', 'phone', 'hp',
+      'website', 'email', 'instagram', 'facebook'
+    ];
+    
+    for (const keyword of skipKeywords) {
+      if (lower.includes(keyword)) return false;
     }
+    
+    // Skip jika ada pattern tanggal
+    if (/\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}/.test(line)) return false;
+    
+    // Skip jika ada pattern waktu (HH:MM atau HH.MM)
+    if (/\d{1,2}[:.]\d{2}/.test(line) && !/\d{3,}/.test(line)) return false;
+    
+    return true;
+  };
+
+  // Parse items dengan multiple pattern dan validasi ketat
+  for (const line of lines) {
+    // Validasi awal
+    if (!isValidItemLine(line)) continue;
 
     let parsed = false;
 
@@ -256,16 +414,23 @@ function parseNotaText(text: string) {
     const isCoffeeShopItem = relevanceScore > 0;
 
     // Pattern 1: "Nama Barang jumlah satuan harga" - Extract nama sebelum angka pertama
-    const pattern1 = /^([a-zA-Z\s]+?)\s+(\d+(?:[.,]\d+)?)\s*([a-zA-Z]+)/i;
+    // Contoh: "Kopi Arabica 2 Kg 50000" atau "Susu UHT 10 liter 150000"
+    const pattern1 = /^([a-zA-Z][a-zA-Z\s]+?)\s+(\d+(?:[.,]\d+)?)\s*([a-zA-Z]+)/i;
     const match1 = cleanLine.match(pattern1);
     if (match1 && !parsed) {
       const [, nama, jumlahStr, satuan] = match1;
       const jumlahValue = parseFloat(jumlahStr.replace(/[.,]/g, ''));
       
-      // PRIORITAS: Coffee shop items dengan score tinggi atau ada angka valid
-      // VALIDASI: jumlahValue harus masuk akal untuk jumlah (< 1000), bukan harga
-      if ((isCoffeeShopItem || (numbers.length > 0 && nama.length > 2 && !nama.toLowerCase().includes('total'))) 
-          && jumlahValue < 1000) {
+      // VALIDASI KETAT:
+      // 1. Nama harus >= 2 chars dan punya huruf yang cukup
+      // 2. jumlahValue harus reasonable untuk quantity (< 1000 atau volume unit)
+      // 3. Harus coffee shop item ATAU punya angka valid untuk harga
+      const hasEnoughLetters = /[a-zA-Z]{2,}/.test(nama);
+      const isVolumeUnit = ['ml', 'gram', 'gr', 'cc'].some(u => satuan.toLowerCase().includes(u));
+      const isReasonableQty = jumlahValue < 1000 || (isVolumeUnit && jumlahValue <= 10000);
+      
+      if (hasEnoughLetters && isReasonableQty && 
+          (isCoffeeShopItem || (numbers.length > 0 && nama.length >= 2))) {
         // Filter out jumlahValue from numbers before classifying prices
         const filteredNumbers = numbers.filter(n => n !== jumlahValue);
         const classified = classifyNumbers(filteredNumbers, satuan, line);
@@ -277,12 +442,19 @@ function parseNotaText(text: string) {
         const finalJumlah = jumlahValue;
         let hargaSatuan = classified.harga_satuan;
         
-        // Hitung harga satuan jika ada jumlah dan harga total
-        if (!hargaSatuan && finalJumlah && classified.harga_total) {
-          hargaSatuan = Math.round(classified.harga_total / finalJumlah);
+        // PRIORITAS: Hitung harga satuan dari total/qty (lebih akurat)
+        if (finalJumlah && classified.harga_total && finalJumlah > 0) {
+          const calculatedPrice = Math.round(classified.harga_total / finalJumlah);
+          // Gunakan calculated price jika masuk akal (> 100 dan berbeda signifikan dari classified)
+          if (calculatedPrice >= 100 && (!hargaSatuan || Math.abs(calculatedPrice - hargaSatuan) > 1000)) {
+            hargaSatuan = calculatedPrice;
+          } else if (!hargaSatuan) {
+            hargaSatuan = calculatedPrice;
+          }
         }
         
-        if (cleanedName.length > 2) {
+        // Allow 2+ chars untuk item pendek seperti "tea"
+        if (cleanedName.length >= 2) {
           items.push({
             nama_barang: cleanedName,
             jumlah: finalJumlah,
@@ -298,15 +470,22 @@ function parseNotaText(text: string) {
     }
 
     // Pattern 2: "10 Kg Kopi 100.000" atau "2 liter Susu 50000" atau "600 ml Aqua"
+    // Quantity di awal, diikuti unit, lalu nama produk
     if (!parsed) {
-      const pattern2 = /^(\d+(?:[.,]\d+)?)\s*([a-zA-Z]+)\s+(.+)/i;
+      const pattern2 = /^(\d+(?:[.,]\d+)?)\s*([a-zA-Z]+)\s+([a-zA-Z].+)/i;
       const match2 = cleanLine.match(pattern2);
       if (match2) {
         const [, jumlahStr, satuan, nama] = match2;
         const jumlahValue = parseFloat(jumlahStr.replace(/[.,]/g, ''));
         
-        // Lebih permisif dalam deteksi
-        if (nama.length > 2 && !nama.toLowerCase().includes('total')) {
+        // VALIDASI:
+        // 1. Nama harus punya huruf yang cukup (minimal 2 chars kata)
+        // 2. Quantity harus reasonable
+        // 3. Unit harus valid
+        const hasValidName = nama.length >= 2 && /[a-zA-Z]{2,}/.test(nama);
+        const isValidUnit = /^(kg|gram|gr|liter|ml|pcs|pack|box|dus|botol|cup)$/i.test(satuan);
+        
+        if (hasValidName && isValidUnit) {
           // Filter out volume/weight value from numbers before classifying prices
           const filteredNumbers = numbers.filter(n => n !== jumlahValue);
           const classified = classifyNumbers(filteredNumbers, satuan, line);
@@ -322,9 +501,14 @@ function parseNotaText(text: string) {
           const finalJumlah = jumlahValue;
           let hargaSatuan = classified.harga_satuan;
           
-          // Hitung harga satuan jika ada jumlah dan harga total
-          if (!hargaSatuan && finalJumlah && classified.harga_total) {
-            hargaSatuan = Math.round(classified.harga_total / finalJumlah);
+          // PRIORITAS: Hitung harga satuan dari total/qty (lebih akurat)
+          if (finalJumlah && classified.harga_total && finalJumlah > 0) {
+            const calculatedPrice = Math.round(classified.harga_total / finalJumlah);
+            if (calculatedPrice >= 100 && (!hargaSatuan || Math.abs(calculatedPrice - hargaSatuan) > 1000)) {
+              hargaSatuan = calculatedPrice;
+            } else if (!hargaSatuan) {
+              hargaSatuan = calculatedPrice;
+            }
           }
           
           items.push({
@@ -341,18 +525,24 @@ function parseNotaText(text: string) {
     }
 
     // Pattern 3: "Kopi - 2kg 100000" atau "Susu : 10 liter 150.000" atau "Aqua - 600ml"
+    // Nama produk dengan separator, lalu quantity dan unit
     if (!parsed) {
-      const pattern3 = /^(.+?)[\s:-]+(\d+(?:[.,]\d+)?)\s*([a-zA-Z]+)/i;
+      const pattern3 = /^([a-zA-Z][a-zA-Z\s]+?)[\s:-]+(\d+(?:[.,]\d+)?)\s*([a-zA-Z]+)/i;
       const match3 = cleanLine.match(pattern3);
       if (match3) {
         const [, nama, jumlahStr, satuan] = match3;
         const jumlahValue = parseFloat(jumlahStr.replace(/[.,]/g, ''));
         
-        // VALIDASI: jumlahValue harus masuk akal untuk jumlah (< 1000 atau volume <=10000 untuk ml/gram)
-        const isVolumeUnit = ['ml', 'gram', 'gr'].some(u => satuan.toLowerCase().includes(u));
+        // VALIDASI KETAT:
+        // 1. Nama harus valid dengan huruf yang cukup
+        // 2. Quantity harus reasonable berdasarkan unit
+        // 3. Unit harus recognized
+        const hasValidName = nama.length >= 2 && /[a-zA-Z]{2,}/.test(nama);
+        const isVolumeUnit = ['ml', 'gram', 'gr', 'cc'].some(u => satuan.toLowerCase().includes(u));
         const isValidJumlah = jumlahValue < 1000 || (isVolumeUnit && jumlahValue <= 10000);
+        const isValidUnit = /^(kg|gram|gr|liter|ml|pcs|pack|box|dus|botol|cup|cc)$/i.test(satuan);
         
-        if (nama.length > 2 && !nama.toLowerCase().includes('total') && isValidJumlah) {
+        if (hasValidName && isValidJumlah && isValidUnit) {
           // Filter out volume/weight value from numbers before classifying prices
           const filteredNumbers = numbers.filter(n => n !== jumlahValue);
           const classified = classifyNumbers(filteredNumbers, satuan, line);
@@ -367,9 +557,14 @@ function parseNotaText(text: string) {
           const finalJumlah = jumlahValue;
           let hargaSatuan = classified.harga_satuan;
           
-          // Hitung harga satuan jika ada jumlah dan harga total
-          if (!hargaSatuan && finalJumlah && classified.harga_total) {
-            hargaSatuan = Math.round(classified.harga_total / finalJumlah);
+          // PRIORITAS: Hitung harga satuan dari total/qty (lebih akurat)
+          if (finalJumlah && classified.harga_total && finalJumlah > 0) {
+            const calculatedPrice = Math.round(classified.harga_total / finalJumlah);
+            if (calculatedPrice >= 100 && (!hargaSatuan || Math.abs(calculatedPrice - hargaSatuan) > 1000)) {
+              hargaSatuan = calculatedPrice;
+            } else if (!hargaSatuan) {
+              hargaSatuan = calculatedPrice;
+            }
           }
           
           items.push({
@@ -385,19 +580,30 @@ function parseNotaText(text: string) {
       }
     }
 
-    // Pattern 4: "Nama Item 100 50.000" - nama di awal, diikuti angka
+    // Pattern 4: "Nama Item 100 50.000" - nama di awal, diikuti angka-angka
+    // Fallback pattern untuk format yang lebih bebas
     if (!parsed) {
-      const pattern4 = /^([a-zA-Z\s]+)\s+(\d+)/i;
+      const pattern4 = /^([a-zA-Z][a-zA-Z\s]+?)\s+(\d+)/i;
       const match4 = cleanLine.match(pattern4);
       if (match4 && numbers.length > 0) {
         const nama = match4[1].trim();
-        if (nama.length > 2 && !nama.toLowerCase().includes('total')) {
+        
+        // VALIDASI: Nama harus valid dan ada coffee shop relevance atau angka yang cukup
+        const hasValidName = nama.length >= 2 && /[a-zA-Z]{2,}/.test(nama);
+        const hasPriceNumbers = numbers.some(n => n >= 1000); // Ada angka yang seperti harga
+        
+        if (hasValidName && (isCoffeeShopItem || hasPriceNumbers)) {
           const classified = classifyNumbers(numbers, undefined, line);
           
-          // Hitung harga satuan jika ada jumlah dan harga total
+          // PRIORITAS: Hitung harga satuan dari total/qty (lebih akurat)
           let hargaSatuan = classified.harga_satuan;
-          if (!hargaSatuan && classified.jumlah && classified.harga_total) {
-            hargaSatuan = Math.round(classified.harga_total / classified.jumlah);
+          if (classified.jumlah && classified.harga_total && classified.jumlah > 0) {
+            const calculatedPrice = Math.round(classified.harga_total / classified.jumlah);
+            if (calculatedPrice >= 100 && (!hargaSatuan || Math.abs(calculatedPrice - hargaSatuan) > 1000)) {
+              hargaSatuan = calculatedPrice;
+            } else if (!hargaSatuan) {
+              hargaSatuan = calculatedPrice;
+            }
           }
           
           items.push({
@@ -417,15 +623,27 @@ function parseNotaText(text: string) {
     if (!parsed && numbers.length > 0 && isCoffeeShopItem) {
       // Extract item name (remove all numbers and extra symbols)
       const nama = cleanLine.replace(/[\d.,@=\s-]+/g, ' ').replace(/\s+/g, ' ').trim();
-      if (nama.length > 2 && !nama.toLowerCase().includes('total') && 
+      if (nama.length >= 2 && !nama.toLowerCase().includes('total') && 
           !nama.toLowerCase().includes('jumlah')) {
         const classified = classifyNumbers(numbers, undefined, line);
+        
+        // PRIORITAS: Hitung harga satuan dari total/qty (lebih akurat)
+        let hargaSatuan = classified.harga_satuan;
+        if (classified.jumlah && classified.harga_total && classified.jumlah > 0) {
+          const calculatedPrice = Math.round(classified.harga_total / classified.jumlah);
+          if (calculatedPrice >= 100 && (!hargaSatuan || Math.abs(calculatedPrice - hargaSatuan) > 1000)) {
+            hargaSatuan = calculatedPrice;
+          } else if (!hargaSatuan) {
+            hargaSatuan = calculatedPrice;
+          }
+        }
+        
         items.push({
           nama_barang: cleanItemName(nama),
           jumlah: classified.jumlah || 1,
           satuan: 'pcs',
           kategori: categorizeItem(nama),
-          harga_satuan: typeof classified.harga_satuan === 'number' ? classified.harga_satuan : undefined,
+          harga_satuan: typeof hargaSatuan === 'number' ? hargaSatuan : undefined,
           harga_total: typeof classified.harga_total === 'number' ? classified.harga_total : undefined,
           relevance: relevanceScore, // Track relevance for debugging
         });
@@ -433,8 +651,41 @@ function parseNotaText(text: string) {
     }
   }
 
+  // VALIDASI FINAL: Cek consistency antara jumlah, harga satuan, dan total
+  const validatedItems = items.map(item => {
+    let { jumlah, harga_satuan, harga_total } = item;
+    
+    // Jika ada jumlah dan total, tapi harga satuan salah atau tidak ada
+    if (jumlah && harga_total && jumlah > 0) {
+      const calculatedSatuan = Math.round(harga_total / jumlah);
+      
+      // Jika harga satuan tidak ada, hitung dari total/jumlah
+      if (!harga_satuan) {
+        harga_satuan = calculatedSatuan;
+      } 
+      // Jika harga satuan ada tapi tidak konsisten (selisih > 20%), gunakan calculated
+      else if (harga_satuan > 0) {
+        const diff = Math.abs(harga_satuan - calculatedSatuan) / calculatedSatuan;
+        if (diff > 0.2) { // Toleransi 20%
+          console.warn(`Inconsistent price detected for ${item.nama_barang}: satuan=${harga_satuan}, calculated=${calculatedSatuan}`);
+          harga_satuan = calculatedSatuan;
+        }
+      }
+      
+      // VALIDASI SWAP: Jika jumlah > 1000, kemungkinan tertukar dengan harga
+      if (jumlah > 1000 && harga_satuan && harga_satuan < 100) {
+        console.warn(`Possible swap detected for ${item.nama_barang}: qty=${jumlah}, price=${harga_satuan}`);
+        // Tukar
+        [jumlah, harga_satuan] = [harga_satuan, jumlah];
+        harga_total = jumlah * harga_satuan;
+      }
+    }
+    
+    return { ...item, jumlah, harga_satuan, harga_total };
+  });
+
   // Format semua harga ke format rupiah - dengan FINAL sanitization
-  const formattedItems = items.map(item => {
+  const formattedItems = validatedItems.map(item => {
     // Sanitize: jika somehow masih ada string, convert ke number
     const satuanNum = typeof item.harga_satuan === 'string' 
       ? parseFloat(item.harga_satuan.replace(/[^0-9]/g, ''))
@@ -488,10 +739,39 @@ function formatRupiah(amount: number | string): string | undefined {
 
 // Helper: Extract store name from supplier line (remove address, keywords)
 function extractStoreName(line: string): string {
-  // Remove common address patterns and keywords
+  // PRIORITAS UTAMA: Extract nama setelah "Toko" dengan berbagai format
+  // Format: "Toko ...Indah Abadi..." atau "Toko: Nama" atau "Toko Nama"
+  const tokoPatterns = [
+    /toko[:\s]*\.+\s*([a-zA-Z\s]+?)(?:\.|$|[\r\n])/i,  // "Toko ...Nama..."
+    /toko[:\s]+([a-zA-Z\s]+?)(?:\s+no\.?|\s+jl\.?|\s+ruko|$|[\r\n])/i,  // "Toko Nama No./Jl./..."
+    /toko[:\s]+([a-zA-Z\s]+)/i  // "Toko Nama" (fallback)
+  ];
+  
+  for (const pattern of tokoPatterns) {
+    const match = line.match(pattern);
+    if (match && match[1]) {
+      let storeName = match[1]
+        .trim()
+        .replace(/\.+/g, '') // Remove dots
+        .replace(/\s+/g, ' ') // Normalize spaces
+        .trim();
+      
+      // Filter out noise: angka, tanggal, alamat pendek
+      if (storeName.length >= 3 && 
+          storeName.length <= 50 && 
+          !/^\d+$/.test(storeName) &&  // Not just numbers
+          !(/\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}/.test(storeName))) {  // Not a date
+        return storeName;
+      }
+    }
+  }
+  
+  // FALLBACK: Remove common address patterns and keywords
   let cleaned = line
     // Remove "Toko" prefix
     .replace(/^(toko|store|supplier|cv|pt|ud|distributor)[:\s]*/gi, '')
+    // Remove dots
+    .replace(/\.+/g, ' ')
     // Remove address patterns with numbers (Ruko, No., Jl., dll)
     .replace(/(ruko|perumahan|jl\.?|jalan|no\.?|rt\.?|rw\.?|kel\.?|kec\.?)\s+[^\s]*/gi, '')
     // Remove standalone numbers that look like addresses
@@ -502,13 +782,12 @@ function extractStoreName(line: string): string {
   
   // If result is too long (likely still has address), take only first part before common separators
   if (cleaned.length > 30) {
-    // Split by common separators and take last meaningful part (usually store name)
-    const parts = cleaned.split(/[,\.\-]/);
-    // Get the last non-empty part which is usually the store name
-    for (let i = parts.length - 1; i >= 0; i--) {
-      const part = parts[i].trim();
-      if (part.length >= 5 && part.length <= 30) {
-        cleaned = part;
+    // Split by common separators and take first meaningful part
+    const parts = cleaned.split(/[,\-]/);
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (trimmed.length >= 3 && trimmed.length <= 30 && !/^\d+$/.test(trimmed)) {
+        cleaned = trimmed;
         break;
       }
     }
@@ -542,32 +821,66 @@ function containsCoffeeShopKeyword(text: string, keywords: string[]): boolean {
   });
 }
 
-// Helper: Calculate relevance score for coffee shop items (higher = more relevant)
+// Helper: Calculate relevance score dengan weighted scoring yang lebih akurat
 function getCoffeeShopRelevanceScore(text: string, keywords: string[]): number {
   const lowerText = text.toLowerCase();
   let score = 0;
   
+  // Priority keywords (common items) - higher weight
+  const priorityKeywords = ['kopi', 'coffee', 'susu', 'milk', 'gula', 'sugar', 'teh', 'tea', 'cup', 'aqua'];
+  
   keywords.forEach(keyword => {
     const lowerKeyword = keyword.toLowerCase();
+    const isPriority = priorityKeywords.includes(lowerKeyword);
+    
     if (lowerText === lowerKeyword) {
-      score += 10; // Exact match
-    } else if (lowerText.includes(lowerKeyword)) {
-      score += 5; // Contains keyword
+      // Exact match - highest score
+      score += isPriority ? 20 : 10;
+    } else if (lowerText.split(/\s+/).includes(lowerKeyword)) {
+      // Word match (not just substring)
+      score += isPriority ? 15 : 8;
+    } else if (lowerText.includes(lowerKeyword) && lowerKeyword.length >= 4) {
+      // Substring match (only for longer keywords to avoid false positives)
+      score += isPriority ? 10 : 5;
     }
   });
   
   return score;
 }
 
-// Helper: Clean item name (remove extra spaces, symbols, numbers, prices)
+// Helper: Clean item name dengan pembersihan yang lebih cerdas
 function cleanItemName(name: string): string {
-  return name
-    .replace(/Rp[\s]?[\d.,]+/gi, '') // Remove Rp dengan angka
-    .replace(/[\d.,]+/g, '') // Remove semua angka
-    .replace(/[@=]/g, '') // Remove simbol @ dan =
-    .replace(/[:\-_]/g, ' ') // Replace separator dengan spasi
-    .replace(/\s+/g, ' ') // Normalize spasi
-    .trim();
+  let cleaned = name;
+  
+  // 1. Remove price patterns (Rp + numbers)
+  cleaned = cleaned.replace(/Rp[\s]?[\d.,]+/gi, '');
+  
+  // 2. Remove standalone large numbers (likely prices)
+  cleaned = cleaned.replace(/\b\d{4,}\b/g, '');
+  
+  // 3. Keep small numbers that might be part of name (e.g., "Kopi 3in1")
+  // But remove quantity numbers with units
+  cleaned = cleaned.replace(/\b\d+\s*(kg|gram|gr|liter|ml|pcs|pack)\b/gi, '');
+  
+  // 4. Remove special symbols
+  cleaned = cleaned.replace(/[@=]/g, '');
+  
+  // 5. Normalize separators to spaces
+  cleaned = cleaned.replace(/[:\-_\/\\]/g, ' ');
+  
+  // 6. Remove extra dots and commas (but keep decimal points if needed)
+  cleaned = cleaned.replace(/[.,]{2,}/g, '');
+  
+  // 7. Normalize multiple spaces to single space
+  cleaned = cleaned.replace(/\s+/g, ' ');
+  
+  // 8. Trim and title case (capitalize first letter of each word)
+  cleaned = cleaned.trim();
+  cleaned = cleaned.split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+  
+  return cleaned;
 }
 
 // Helper: Normalize satuan to standard units
@@ -599,36 +912,73 @@ function normalizeSatuan(satuan: string): string {
   return 'pcs';
 }
 
-// Helper: Categorize item based on name
+// Helper: Kategorisasi item dengan prioritas yang lebih detail
 function categorizeItem(name: string): string {
   const lower = name.toLowerCase();
   
-  // Bahan Baku
-  const bahanBaku = [
-    'kopi', 'coffee', 'arabica', 'robusta', 'espresso',
-    'susu', 'milk', 'cream', 'creamer',
-    'gula', 'sugar', 'madu', 'honey',
-    'teh', 'tea', 'matcha', 'coklat', 'chocolate',
-    'sirup', 'syrup', 'vanilla', 'caramel', 'hazelnut',
-    'milo', 'ovaltine', 'bubuk', 'powder',
-    'air', 'water', 'aqua', 'mineral'
-  ];
-  
-  // Kemasan
-  const kemasan = [
-    'cup', 'gelas', 'paper cup', 'plastic cup',
-    'sedotan', 'straw', 'lid', 'tutup',
-    'box', 'paper bag', 'plastik', 'plastic',
-    'tissue', 'serbet', 'napkin', 'wrapper'
-  ];
-  
-  for (const keyword of bahanBaku) {
-    if (lower.includes(keyword)) return 'Bahan Baku';
+  // Kategori Kopi (priority 1)
+  const kopi = ['kopi', 'coffee', 'arabica', 'robusta', 'liberica', 'espresso', 
+                'cappuccino', 'americano', 'latte', 'macchiato', 'mocha'];
+  for (const keyword of kopi) {
+    if (lower.includes(keyword)) return 'Kopi';
   }
   
+  // Kategori Susu & Dairy (priority 2)
+  const susu = ['susu', 'milk', 'cream', 'creamer', 'krim', 'krimer', 
+                'uht', 'dairy', 'condensed', 'evaporated'];
+  for (const keyword of susu) {
+    if (lower.includes(keyword)) return 'Susu & Dairy';
+  }
+  
+  // Kategori Teh (priority 3)
+  const teh = ['teh', 'tea', 'matcha', 'earl grey', 'chamomile', 
+               'jasmine', 'oolong', 'hojicha'];
+  for (const keyword of teh) {
+    if (lower.includes(keyword)) return 'Teh';
+  }
+  
+  // Kategori Pemanis (priority 4)
+  const pemanis = ['gula', 'sugar', 'madu', 'honey', 'stevia', 'sweetener'];
+  for (const keyword of pemanis) {
+    if (lower.includes(keyword)) return 'Pemanis';
+  }
+  
+  // Kategori Sirup & Saus
+  const sirup = ['sirup', 'syrup', 'vanilla', 'caramel', 'hazelnut', 
+                 'sauce', 'saus', 'chocolate', 'coklat'];
+  for (const keyword of sirup) {
+    if (lower.includes(keyword)) return 'Sirup & Saus';
+  }
+  
+  // Kategori Bubuk & Powder
+  const bubuk = ['milo', 'ovaltine', 'bubuk', 'powder', 'cocoa', 'choco'];
+  for (const keyword of bubuk) {
+    if (lower.includes(keyword)) return 'Bubuk & Powder';
+  }
+  
+  // Kategori Kemasan
+  const kemasan = ['cup', 'gelas', 'paper cup', 'plastic cup',
+                   'sedotan', 'straw', 'lid', 'tutup',
+                   'box', 'paper bag', 'plastik', 'plastic',
+                   'tissue', 'tisu', 'serbet', 'napkin', 'wrapper'];
   for (const keyword of kemasan) {
     if (lower.includes(keyword)) return 'Kemasan';
   }
   
-  return 'Lainnya';
+  // Kategori Minuman Lain
+  const minuman = ['air', 'water', 'aqua', 'mineral', 'soda', 'sprite', 
+                   'coca', 'fanta', 'juice'];
+  for (const keyword of minuman) {
+    if (lower.includes(keyword)) return 'Minuman';
+  }
+  
+  // Kategori Topping
+  const topping = ['whipped', 'ice cream', 'topping', 'jelly', 'pudding',
+                   'boba', 'pearl', 'cincau'];
+  for (const keyword of topping) {
+    if (lower.includes(keyword)) return 'Topping';
+  }
+  
+  // Default
+  return 'Bahan Baku';
 }

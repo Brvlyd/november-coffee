@@ -41,6 +41,10 @@ export default function InputBarangPage() {
   const [notaData, setNotaData] = React.useState<NotaData | null>(null);
   const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
   const [editingItem, setEditingItem] = React.useState<NotaItem | null>(null);
+  const [editingSupplier, setEditingSupplier] = React.useState(false);
+  const [editingTanggal, setEditingTanggal] = React.useState(false);
+  const [tempSupplier, setTempSupplier] = React.useState('');
+  const [tempTanggal, setTempTanggal] = React.useState('');
   const [inventoryItems, setInventoryItems] = React.useState<InventoryItem[]>([]);
   const [selectedInventoryItem, setSelectedInventoryItem] = React.useState<InventoryItem | null>(null);
   const [formData, setFormData] = React.useState({
@@ -553,16 +557,98 @@ export default function InputBarangPage() {
                   </h3>
                 </div>
 
-                {notaData.supplier && (
-                  <p className="text-sm text-gray-700 mb-2">
-                    <strong>Supplier:</strong> {notaData.supplier}
-                  </p>
-                )}
-                {notaData.tanggal && (
-                  <p className="text-sm text-gray-700 mb-2">
-                    <strong>Tanggal:</strong> {notaData.tanggal}
-                  </p>
-                )}
+                <div className="flex items-center gap-2 mb-2">
+                  <strong className="text-sm text-gray-700">Supplier:</strong>
+                  {editingSupplier ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={tempSupplier}
+                        onChange={(e) => setTempSupplier(e.target.value)}
+                        className="px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
+                        placeholder="Nama supplier"
+                      />
+                      <button
+                        onClick={() => {
+                          setNotaData({ ...notaData, supplier: tempSupplier });
+                          setEditingSupplier(false);
+                          toast.success('Supplier diupdate');
+                        }}
+                        className="p-1.5 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                        title="Simpan"
+                      >
+                        <Save className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => setEditingSupplier(false)}
+                        className="p-1.5 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                        title="Batal"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-700">{notaData.supplier || '-'}</span>
+                      <button
+                        onClick={() => {
+                          setTempSupplier(notaData.supplier || '');
+                          setEditingSupplier(true);
+                        }}
+                        className="p-1 text-blue-600 hover:text-blue-800 transition-colors"
+                        title="Edit supplier"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 mb-2">
+                  <strong className="text-sm text-gray-700">Tanggal:</strong>
+                  {editingTanggal ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={tempTanggal}
+                        onChange={(e) => setTempTanggal(e.target.value)}
+                        className="px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
+                        placeholder="dd/mm/yyyy"
+                      />
+                      <button
+                        onClick={() => {
+                          setNotaData({ ...notaData, tanggal: tempTanggal });
+                          setEditingTanggal(false);
+                          toast.success('Tanggal diupdate');
+                        }}
+                        className="p-1.5 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                        title="Simpan"
+                      >
+                        <Save className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => setEditingTanggal(false)}
+                        className="p-1.5 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                        title="Batal"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-700">{notaData.tanggal || '-'}</span>
+                      <button
+                        onClick={() => {
+                          setTempTanggal(notaData.tanggal || '');
+                          setEditingTanggal(true);
+                        }}
+                        className="p-1 text-blue-600 hover:text-blue-800 transition-colors"
+                        title="Edit tanggal"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
                 {notaData.total && (
                   <p className="text-sm text-gray-700 mb-4">
                     <strong>Total:</strong> {notaData.total}

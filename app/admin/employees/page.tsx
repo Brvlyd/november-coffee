@@ -2,8 +2,9 @@
 
 import * as React from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Edit, Trash2, Search, User } from 'lucide-react';
+import { Plus, Search, User } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useRouter } from 'next/navigation';
 
 interface Employee {
   id: string;
@@ -20,17 +21,37 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = React.useState<Employee[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
-  const [editingEmployee, setEditingEmployee] = React.useState<Employee | null>(null);
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [idError, setIdError] = React.useState('');
+  const [isGeneratingIds, setIsGeneratingIds] = React.useState(false);
+  const router = useRouter();
   
   const [formData, setFormData] = React.useState({
     employee_id: '',
     full_name: '',
-    position: '',
+    position: 'Barista',
     employment_status: 'Active',
     email: '',
     password: '',
   });
+
+  const generateEmployeeId = (position: string, employeeCount: number) => {
+    const positionCodes: { [key: string]: string } = {
+      'Gudang': 'GU',
+      'Barista': 'BA',
+      'Kasir': 'KA',
+      'Manager': 'MA',
+    };
+
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear());
+    const sequence = String(employeeCount + 1).padStart(3, '0');
+
+    const positionCode = positionCodes[position] || 'XX';
+    return `${positionCode}${day}${month}${year}${sequence}`;
+  };
 
   React.useEffect(() => {
     fetchEmployees();
@@ -61,23 +82,33 @@ export default function EmployeesPage() {
       return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      toast.error('Format email tidak valid!');
+      return;
+    }
+
+    // Validate employee ID format
+    if (!validateEmployeeId(formData.employee_id)) {
+      toast.error('Format ID Karyawan tidak valid! Periksa kembali.');
+      return;
+    }
+
     try {
       const url = '/api/employees';
-      const method = editingEmployee ? 'PUT' : 'POST';
-      const body = editingEmployee 
-        ? { ...formData, id: editingEmployee.id }
-        : formData;
+      const method = 'POST';
 
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(formData),
       });
 
       const result = await response.json();
 
       if (response.ok) {
-        toast.success(editingEmployee ? 'Karyawan berhasil diupdate' : 'Karyawan berhasil ditambahkan');
+        toast.success('Karyawan berhasil ditambahkan');
         fetchEmployees();
         closeModal();
       } else {
@@ -86,6 +117,42 @@ export default function EmployeesPage() {
     } catch (error) {
       toast.error('Terjadi kesalahan');
     }
+  };
+
+  const validateEmployeeId = (id: string): boolean => {
+    // Format: 2 huruf + 8 angka (DDMMYYYY) + 3 angka (total 13 karakter)
+    const regex = /^[A-Z]{2}\d{8}\d{3}$/;
+    
+    if (!regex.test(id)) {
+      setIdError('Format harus: 2 huruf + tanggal (DDMMYYYY) + 3 digit urutan');
+      return false;
+    }
+
+    const positionCode = id.substring(0, 2);
+    const validCodes = ['BA', 'KA', 'GU', 'MA'];
+    
+    if (!validCodes.includes(positionCode)) {
+      setIdError('Kode posisi harus: BA, KA, GU, atau MA');
+      return false;
+    }
+
+    const day = parseInt(id.substring(2, 4));
+    const month = parseInt(id.substring(4, 6));
+    const year = parseInt(id.substring(6, 10));
+    
+    if (day < 1 || day > 31 || month < 1 || month > 12 || year < 2000 || year > 2100) {
+      setIdError('Tanggal tidak valid');
+      return false;
+    }
+
+    const sequence = parseInt(id.substring(10, 13));
+    if (sequence < 1 || sequence > 999) {
+      setIdError('Nomor urut harus 001-999');
+      return false;
+    }
+
+    setIdError('');
+    return true;
   };
 
   const handleDelete = async (id: string) => {
@@ -109,32 +176,112 @@ export default function EmployeesPage() {
     }
   };
 
-  const openModal = (employee?: Employee) => {
-    if (employee) {
-      setEditingEmployee(employee);
-      setFormData({
-        employee_id: employee.employee_id,
-        full_name: employee.full_name,
-        position: employee.position,
-        employment_status: employee.employment_status,
-        email: employee.email,
-        password: '',
-      });
-    }
+  const openModal = () => {
+    const newId = generateEmployeeId(formData.position, employees.length);
+    setFormData({ ...formData, employee_id: newId });
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
-    setEditingEmployee(null);
+    setIdError('');
     setFormData({
       employee_id: '',
       full_name: '',
-      position: '',
+      position: 'Barista',
       employment_status: 'Active',
       email: '',
       password: '',
     });
+  };
+
+  const handlePositionChange = (newPosition: string) => {
+    const newId = generateEmployeeId(newPosition, employees.length);
+    setFormData({ ...formData, position: newPosition, employee_id: newId });
+  };
+
+  const autoGenerateAllIds = async () => {
+    if (!confirm('Auto-generate ID untuk semua karyawan? ID yang sudah sesuai format tidak akan diubah.')) return;
+
+    setIsGeneratingIds(true);
+    let updatedCount = 0;
+    let errorCount = 0;
+
+    try {
+      const positionCounts: { [key: string]: number } = {
+        'Barista': 0,
+        'Kasir': 0,
+        'Gudang': 0,
+        'Manager': 0,
+      };
+
+      // Sort employees by created_at
+      const sortedEmployees = [...employees].sort((a, b) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+
+      for (const emp of sortedEmployees) {
+        // Skip if ID already has correct format
+        const regex = /^[A-Z]{2}\d{11}$/;
+        if (regex.test(emp.employee_id)) {
+          continue;
+        }
+
+        // Generate new ID based on created_at date
+        const createdDate = new Date(emp.created_at);
+        const day = String(createdDate.getDate()).padStart(2, '0');
+        const month = String(createdDate.getMonth() + 1).padStart(2, '0');
+        const year = String(createdDate.getFullYear());
+        
+        const positionCodes: { [key: string]: string } = {
+          'Gudang': 'GU',
+          'Barista': 'BA',
+          'Kasir': 'KA',
+          'Manager': 'MA',
+        };
+
+        const positionCode = positionCodes[emp.position] || 'XX';
+        positionCounts[emp.position] = (positionCounts[emp.position] || 0) + 1;
+        const sequence = String(positionCounts[emp.position]).padStart(3, '0');
+        
+        const newId = `${positionCode}${day}${month}${year}${sequence}`;
+
+        // Update employee
+        try {
+          const response = await fetch('/api/employees', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: emp.id,
+              employee_id: newId,
+              full_name: emp.full_name,
+              position: emp.position,
+              employment_status: emp.employment_status,
+              email: emp.email,
+            }),
+          });
+
+          if (response.ok) {
+            updatedCount++;
+          } else {
+            errorCount++;
+          }
+        } catch (error) {
+          errorCount++;
+        }
+      }
+
+      toast.success(`Berhasil generate ${updatedCount} ID karyawan!`);
+      if (errorCount > 0) {
+        toast.error(`${errorCount} karyawan gagal diupdate`);
+      }
+      
+      fetchEmployees();
+    } catch (error) {
+      toast.error('Terjadi kesalahan saat generate ID');
+    } finally {
+      setIsGeneratingIds(false);
+    }
   };
 
   const filteredEmployees = employees.filter(emp =>
@@ -159,13 +306,22 @@ export default function EmployeesPage() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Daftar Karyawan</h1>
           <p className="text-gray-600 font-medium">Kelola data karyawan November Coffee</p>
         </div>
-        <button
-          onClick={() => openModal()}
-          className="flex items-center gap-2 bg-[#C84B31] text-white px-6 py-3 rounded-lg hover:bg-[#A03B24] transition-colors font-semibold"
-        >
-          <Plus className="w-5 h-5" />
-          Tambah Karyawan
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={autoGenerateAllIds}
+            disabled={isGeneratingIds}
+            className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isGeneratingIds ? 'Generating...' : 'Auto-Generate ID Semua'}
+          </button>
+          <button
+            onClick={() => openModal()}
+            className="flex items-center gap-2 bg-[#C84B31] text-white px-6 py-3 rounded-lg hover:bg-[#A03B24] transition-colors font-semibold"
+          >
+            <Plus className="w-5 h-5" />
+            Tambah Karyawan
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -190,51 +346,44 @@ export default function EmployeesPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05 }}
-            className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all p-6"
+            className="bg-gradient-to-br from-[#E07856] to-[#D96846] rounded-2xl shadow-lg hover:shadow-xl transition-all p-6"
           >
             {/* Avatar */}
             <div className="flex justify-center mb-4">
-              <div className="w-24 h-24 bg-gradient-to-br from-[#C84B31] to-[#A03B24] rounded-full flex items-center justify-center">
-                <User className="w-12 h-12 text-white" />
+              <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-md ring-4 ring-white/30">
+                <User className="w-14 h-14 text-[#C84B31]" />
               </div>
             </div>
 
             {/* Info */}
             <div className="text-center mb-4">
-              <h3 className="text-lg font-bold text-gray-900 mb-1">{employee.full_name}</h3>
-              <p className="text-sm text-gray-600 mb-2 font-medium">{employee.employee_id}</p>
-              <p className="text-sm text-[#C84B31] font-semibold mb-1">{employee.position}</p>
-              <p className="text-sm text-gray-500 font-medium">{employee.email || 'No email'}</p>
+              <h3 className="text-xl font-bold text-white mb-2">{employee.full_name}</h3>
+              <p className="text-white/90 text-sm font-medium mb-4">{employee.position}</p>
+              
+              {/* Shift and Status Table */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg overflow-hidden mb-4">
+                <div className="grid grid-cols-2 divide-x divide-white/20">
+                  <div className="px-3 py-2">
+                    <p className="text-white/80 text-xs font-semibold mb-1">Shift</p>
+                    <p className="text-white text-sm font-bold">
+                      {employee.employment_status === 'Active' ? 'Pagi' : '-'}
+                    </p>
+                  </div>
+                  <div className="px-3 py-2">
+                    <p className="text-white/80 text-xs font-semibold mb-1">Status</p>
+                    <p className="text-white text-sm font-bold">{employee.employment_status}</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => openModal(employee)}
-                className="flex-1 flex items-center justify-center gap-2 bg-blue-50 text-blue-600 py-2 rounded-lg hover:bg-blue-100 transition-colors font-semibold"
-              >
-                <Edit className="w-4 h-4" />
-                Edit
-              </button>
-              {employee.position.toLowerCase() !== 'manager' ? (
-                <button
-                  onClick={() => handleDelete(employee.id)}
-                  className="flex-1 flex items-center justify-center gap-2 bg-red-50 text-red-600 py-2 rounded-lg hover:bg-red-100 transition-colors font-semibold"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Hapus
-                </button>
-              ) : (
-                <button
-                  disabled
-                  className="flex-1 flex items-center justify-center gap-2 bg-gray-100 text-gray-400 py-2 rounded-lg cursor-not-allowed font-semibold"
-                  title="Manager tidak dapat dihapus"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Hapus
-                </button>
-              )}
-            </div>
+            <button
+              onClick={() => router.push(`/admin/employees/${employee.id}`)}
+              className="w-full bg-white text-[#C84B31] py-3 rounded-xl hover:bg-gray-50 transition-colors font-bold shadow-md"
+            >
+              Riwayat Absensi
+            </button>
           </motion.div>
         ))}
       </div>
@@ -260,7 +409,7 @@ export default function EmployeesPage() {
             >
               <div className="px-6 py-4 border-b border-gray-200">
                 <h2 className="text-xl font-bold text-gray-900">
-                  {editingEmployee ? 'Edit Karyawan' : 'Tambah Karyawan'}
+                  Tambah Karyawan
                 </h2>
               </div>
 
@@ -272,11 +421,19 @@ export default function EmployeesPage() {
                   <input
                     type="text"
                     value={formData.employee_id}
-                    onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900 font-medium"
+                    onChange={(e) => setFormData({ ...formData, employee_id: e.target.value.toUpperCase() })}
+                    maxLength={13}
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-gray-900 font-medium ${
+                      idError 
+                        ? 'border-red-300 focus:ring-red-500 bg-red-50' 
+                        : 'border-gray-300 focus:ring-[#C84B31]'
+                    }`}
                     required
-                    disabled={!!editingEmployee}
                   />
+                  {idError && (
+                    <p className="mt-1 text-xs text-red-600 font-semibold">{idError}</p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500">Otomatis dibuat saat pilih posisi. Total 13 karakter.</p>
                 </div>
 
                 <div>
@@ -296,14 +453,18 @@ export default function EmployeesPage() {
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Posisi
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.position}
-                    onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900 font-medium placeholder:text-gray-400"
-                    placeholder="e.g., Barista, Cashier"
+                    onChange={(e) => handlePositionChange(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900 font-medium"
                     required
-                  />
+                  >
+                    <option value="Barista">Barista</option>
+                    <option value="Kasir">Kasir</option>
+                    <option value="Gudang">Gudang</option>
+                    <option value="Manager">Manager</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">ID akan otomatis diupdate sesuai posisi</p>
                 </div>
 
                 <div>
@@ -337,14 +498,14 @@ export default function EmployeesPage() {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    {editingEmployee ? 'Password Baru (kosongkan jika tidak diubah)' : 'Password'}
+                    Password
                   </label>
                   <input
                     type="password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900 font-medium"
-                    required={!editingEmployee}
+                    required
                   />
                 </div>
 
@@ -360,7 +521,7 @@ export default function EmployeesPage() {
                     type="submit"
                     className="flex-1 bg-[#C84B31] text-white px-4 py-2 rounded-lg hover:bg-[#A03B24] transition-colors font-semibold"
                   >
-                    {editingEmployee ? 'Update' : 'Tambah'}
+                    Tambah
                   </button>
                 </div>
               </form>

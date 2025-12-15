@@ -51,11 +51,6 @@ const menuItems = [
     icon: ClipboardList,
     label: 'Absensi',
   },
-  {
-    href: '/admin/payroll',
-    icon: DollarSign,
-    label: 'Slip Gaji',
-  },
 ];
 
 export default function ManagerLayout({
