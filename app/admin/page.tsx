@@ -5,17 +5,19 @@ import { motion } from 'framer-motion';
 import { Users, UserCheck, Package, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { getCurrentShift } from '@/lib/shift';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface Stats {
   totalEmployees: number;
-  todayAttendance: number;
+  activeWorkers: number;
   lowStockItems: number;
   totalInventory: number;
 }
 
 interface AttendanceStats {
   hadir: number;
-  izin: number;
+  terlambat: number;
   absen: number;
 }
 
@@ -23,33 +25,51 @@ interface DailyAttendance {
   [date: string]: {
     total: number;
     hadir: number;
-    izin: number;
+    terlambat: number;
     absen: number;
   };
+}
+
+interface ShiftAttendanceData {
+  date: string;
+  Pagi: number;
+  Malam: number;
+  'Dini Hari': number;
+}
+
+interface AttendanceTrendData {
+  date: string;
+  hadir: number;
+  terlambat: number;
+  absen: number;
 }
 
 export default function ManagerDashboard() {
   const router = useRouter();
   const [stats, setStats] = React.useState<Stats>({
     totalEmployees: 0,
-    todayAttendance: 0,
+    activeWorkers: 0,
     lowStockItems: 0,
     totalInventory: 0,
   });
   const [attendanceStats, setAttendanceStats] = React.useState<AttendanceStats>({
     hadir: 0,
-    izin: 0,
+    terlambat: 0,
     absen: 0,
   });
   const [dailyAttendance, setDailyAttendance] = React.useState<DailyAttendance>({});
   const [selectedMonth, setSelectedMonth] = React.useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = React.useState(new Date().getFullYear());
   const [loading, setLoading] = React.useState(true);
+  const [shiftData, setShiftData] = React.useState<ShiftAttendanceData[]>([]);
+  const [trendData, setTrendData] = React.useState<AttendanceTrendData[]>([]);
 
   React.useEffect(() => {
     // Initial fetch
     fetchStats();
     fetchMonthlyAttendance();
+    fetchShiftAttendance();
+    fetchAttendanceTrend();
 
     // Set up real-time subscription for employees table
     const employeesSubscription = supabase
@@ -70,6 +90,8 @@ export default function ManagerDashboard() {
         () => {
           fetchStats();
           fetchMonthlyAttendance();
+          fetchShiftAttendance();
+          fetchAttendanceTrend();
         }
       )
       .subscribe();
@@ -124,25 +146,141 @@ export default function ManagerDashboard() {
       attendanceData?.forEach((record) => {
         const date = record.date;
         if (!dailyData[date]) {
-          dailyData[date] = { total: 0, hadir: 0, izin: 0, absen: 0 };
+          dailyData[date] = { total: 0, hadir: 0, terlambat: 0, absen: 0 };
         }
         dailyData[date].total++;
         // Jika status adalah 'Hadir' atau null/belum check-out, hitung sebagai hadir
         if (record.status === 'Hadir' || !record.status) {
           dailyData[date].hadir++;
         }
-        if (record.status === 'Izin') dailyData[date].izin++;
+        // Logika terlambat akan dihitung dari check_in_at vs shift_id
       });
 
       // Calculate absen for each day
       Object.keys(dailyData).forEach(date => {
         const dayData = dailyData[date];
-        dayData.absen = (totalEmployees || 0) - dayData.hadir - dayData.izin;
+        dayData.absen = (totalEmployees || 0) - dayData.hadir - dayData.terlambat;
       });
 
       setDailyAttendance(dailyData);
     } catch (error) {
       console.error('Error fetching monthly attendance:', error);
+    }
+  };
+
+  const fetchShiftAttendance = async () => {
+    try {
+      // Get last 7 days
+      const dates = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        dates.push(date.toISOString().split('T')[0]);
+      }
+
+      const { data: attendanceData } = await supabase
+        .from('attendance')
+        .select('date, shift_id')
+        .gte('date', dates[0])
+        .lte('date', dates[6]);
+
+      // Group by date and shift
+      const shiftDataMap: { [key: string]: ShiftAttendanceData } = {};
+      
+      dates.forEach(date => {
+        const dateFormatted = new Date(date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+        shiftDataMap[date] = {
+          date: dateFormatted,
+          Pagi: 0,
+          Malam: 0,
+          'Dini Hari': 0
+        };
+      });
+
+      attendanceData?.forEach((record) => {
+        if (shiftDataMap[record.date]) {
+          if (record.shift_id === 1) shiftDataMap[record.date].Pagi++;
+          else if (record.shift_id === 2) shiftDataMap[record.date].Malam++;
+          else if (record.shift_id === 3) shiftDataMap[record.date]['Dini Hari']++;
+        }
+      });
+
+      setShiftData(Object.values(shiftDataMap));
+    } catch (error) {
+      console.error('Error fetching shift attendance:', error);
+    }
+  };
+
+  const fetchAttendanceTrend = async () => {
+    try {
+      // Get last 30 days
+      const dates = [];
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        dates.push(date.toISOString().split('T')[0]);
+      }
+
+      const { data: attendanceData } = await supabase
+        .from('attendance')
+        .select('date, check_in_at, shift_id')
+        .gte('date', dates[0])
+        .lte('date', dates[29]);
+
+      const { count: totalEmployees } = await supabase
+        .from('employees')
+        .select('*', { count: 'exact', head: true })
+        .neq('position', 'Admin');
+
+      // Group by date
+      const trendDataMap: { [key: string]: { hadir: number; terlambat: number } } = {};
+      
+      dates.forEach(date => {
+        trendDataMap[date] = { hadir: 0, terlambat: 0 };
+      });
+
+      attendanceData?.forEach((record) => {
+        if (trendDataMap[record.date]) {
+          trendDataMap[record.date].hadir++;
+          
+          // Check if late (more than 5 minutes after shift start)
+          const checkInTime = new Date(record.check_in_at);
+          const checkInHour = checkInTime.getUTCHours() + 7; // Convert to WIB
+          const checkInMinute = checkInTime.getUTCMinutes();
+          
+          let isLate = false;
+          if (record.shift_id === 1) { // Pagi 11:00
+            const startTime = 11 * 60; // 11:00 in minutes
+            const actualTime = (checkInHour % 24) * 60 + checkInMinute;
+            isLate = actualTime > startTime + 5; // Terlambat jika lebih dari 5 menit setelah shift dimulai
+          } else if (record.shift_id === 2) { // Malam 19:00
+            const startTime = 19 * 60; // 19:00 in minutes
+            const actualTime = (checkInHour % 24) * 60 + checkInMinute;
+            isLate = actualTime > startTime + 5; // Terlambat jika lebih dari 5 menit setelah shift dimulai
+          } else if (record.shift_id === 3) { // Dini Hari 03:00
+            const startTime = 3 * 60; // 03:00 in minutes
+            const actualTime = (checkInHour % 24) * 60 + checkInMinute;
+            isLate = actualTime > startTime + 5; // Terlambat jika lebih dari 5 menit setelah shift dimulai
+          }
+          
+          if (isLate) trendDataMap[record.date].terlambat++;
+        }
+      });
+
+      // Convert to array with formatted dates and calculate absen
+      const trendArray = dates.map(date => {
+        const dateFormatted = new Date(date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+        return {
+          date: dateFormatted,
+          hadir: trendDataMap[date].hadir,
+          terlambat: trendDataMap[date].terlambat,
+          absen: (totalEmployees || 0) - trendDataMap[date].hadir
+        };
+      });
+
+      setTrendData(trendArray);
+    } catch (error) {
+      console.error('Error fetching attendance trend:', error);
     }
   };
 
@@ -197,8 +335,8 @@ export default function ManagerDashboard() {
       return 'bg-red-100 hover:bg-red-200 border border-red-300';
     }
 
-    // Total karyawan yang hadir atau izin (yang tercatat absensi)
-    const totalAttendance = dayData.hadir + dayData.izin;
+    // Total karyawan yang hadir atau terlambat (yang tercatat absensi)
+    const totalAttendance = dayData.hadir + dayData.terlambat;
     
     // Jika hanya 0, 1, atau 2 pegawai yang hadir/izin, langsung merah
     if (totalAttendance <= 2) return 'bg-red-100 hover:bg-red-200 border border-red-300';
@@ -230,22 +368,65 @@ export default function ManagerDashboard() {
         .select('*', { count: 'exact', head: true })
         .neq('position', 'Admin');
 
-      const today = new Date().toISOString().split('T')[0];
-      const { count: attendanceCount } = await supabase
+      // Gunakan timezone Indonesia (WIB)
+      const now = new Date();
+      // Konversi ke WIB dengan offset +7 jam
+      const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+      const today = wibTime.toISOString().split('T')[0];
+      
+      // Get current shift to filter active workers
+      const currentShift = getCurrentShift();
+      
+      // Count active workers (checked in but not checked out for current shift today)
+      const { count: activeWorkersCount } = await supabase
         .from('attendance')
         .select('*', { count: 'exact', head: true })
-        .eq('date', today);
+        .eq('date', today)
+        .eq('shift_id', currentShift.id)
+        .not('check_in_at', 'is', null)
+        .is('check_out_at', null);
 
-      // Get attendance breakdown by status
+      // Get attendance breakdown by status and check_in_at for late detection
       const { data: attendanceData } = await supabase
         .from('attendance')
-        .select('status')
+        .select('status, check_in_at, shift_id')
         .eq('date', today);
 
-      const hadirCount = attendanceData?.filter(a => a.status === 'Hadir').length || 0;
-      const izinCount = attendanceData?.filter(a => a.status === 'Izin').length || 0;
+      let hadirCount = 0;
+      let terlambatCount = 0;
+      
+      attendanceData?.forEach(record => {
+        if (record.status === 'Hadir' && record.check_in_at) {
+          // Check if late
+          const checkInTime = new Date(record.check_in_at);
+          const checkInHour = checkInTime.getUTCHours() + 7; // Convert to WIB
+          const checkInMinute = checkInTime.getUTCMinutes();
+          
+          let isLate = false;
+          if (record.shift_id === 1) { // Pagi 11:00
+            const startTime = 11 * 60; // 11:00 in minutes
+            const actualTime = (checkInHour % 24) * 60 + checkInMinute;
+            isLate = actualTime > startTime + 5; // Terlambat jika lebih dari 5 menit setelah shift dimulai
+          } else if (record.shift_id === 2) { // Malam 19:00
+            const startTime = 19 * 60; // 19:00 in minutes
+            const actualTime = (checkInHour % 24) * 60 + checkInMinute;
+            isLate = actualTime > startTime + 5; // Terlambat jika lebih dari 5 menit setelah shift dimulai
+          } else if (record.shift_id === 3) { // Dini Hari 03:00
+            const startTime = 3 * 60; // 03:00 in minutes
+            const actualTime = (checkInHour % 24) * 60 + checkInMinute;
+            isLate = actualTime > startTime + 5; // Terlambat jika lebih dari 5 menit setelah shift dimulai
+          }
+          
+          if (isLate) {
+            terlambatCount++;
+          } else {
+            hadirCount++;
+          }
+        }
+      });
+      
       const totalEmployees = employeeCount || 0;
-      const absenCount = totalEmployees - hadirCount - izinCount;
+      const absenCount = totalEmployees - hadirCount - terlambatCount;
 
       const { count: inventoryCount } = await supabase
         .from('inventori')
@@ -258,14 +439,14 @@ export default function ManagerDashboard() {
 
       setStats({
         totalEmployees: totalEmployees,
-        todayAttendance: attendanceCount || 0,
+        activeWorkers: activeWorkersCount || 0,
         lowStockItems: lowStockCount || 0,
         totalInventory: inventoryCount || 0,
       });
 
       setAttendanceStats({
         hadir: hadirCount,
-        izin: izinCount,
+        terlambat: terlambatCount,
         absen: Math.max(0, absenCount),
       });
     } catch (error) {
@@ -283,8 +464,8 @@ export default function ManagerDashboard() {
       color: 'bg-blue-500',
     },
     {
-      title: 'Hadir Hari Ini',
-      value: stats.todayAttendance,
+      title: 'Sedang Bekerja',
+      value: stats.activeWorkers,
       icon: UserCheck,
       color: 'bg-green-500',
     },
@@ -403,158 +584,78 @@ export default function ManagerDashboard() {
             transition={{ delay: 0.4 }}
             className="bg-white rounded-xl shadow-sm p-6"
           >
-            <h3 className="text-lg font-semibold text-gray-900 mb-6">Grafik Kehadiran Karyawan</h3>
-            <div className="flex items-center justify-center">
-              {/* Donut Chart */}
-              <div className="relative w-64 h-64">
-                {/* SVG Donut */}
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                  {(() => {
-                    const total = attendanceStats.hadir + attendanceStats.izin + attendanceStats.absen;
-                    if (total === 0) {
-                      return (
-                        <circle
-                          cx="50"
-                          cy="50"
-                          r="40"
-                          fill="none"
-                          stroke="#E5E7EB"
-                          strokeWidth="20"
-                        />
-                      );
-                    }
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">Kehadiran per Shift (7 Hari Terakhir)</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={shiftData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#fff', 
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: '14px' }} />
+                <Bar dataKey="Pagi" fill="#10B981" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="Malam" fill="#8B5CF6" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="Dini Hari" fill="#F59E0B" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </motion.div>
 
-                    const radius = 40;
-                    const circumference = 2 * Math.PI * radius;
-                    
-                    const hadirPercent = (attendanceStats.hadir / total) * 100;
-                    const izinPercent = (attendanceStats.izin / total) * 100;
-                    const absenPercent = (attendanceStats.absen / total) * 100;
-
-                    const hadirLength = (hadirPercent / 100) * circumference;
-                    const izinLength = (izinPercent / 100) * circumference;
-                    const absenLength = (absenPercent / 100) * circumference;
-
-                    let offset = 0;
-
-                    return (
-                      <>
-                        {/* Hadir - Green */}
-                        {attendanceStats.hadir > 0 && (
-                          <motion.circle
-                            initial={{ strokeDashoffset: circumference }}
-                            animate={{ strokeDashoffset: offset }}
-                            transition={{ duration: 1, delay: 0.5 }}
-                            cx="50"
-                            cy="50"
-                            r={radius}
-                            fill="none"
-                            stroke="#10B981"
-                            strokeWidth="20"
-                            strokeDasharray={`${hadirLength} ${circumference}`}
-                            strokeDashoffset={offset}
-                            strokeLinecap="round"
-                          />
-                        )}
-                        
-                        {/* Izin - Yellow */}
-                        {attendanceStats.izin > 0 && (() => {
-                          offset -= hadirLength;
-                          return (
-                            <motion.circle
-                              initial={{ strokeDashoffset: circumference }}
-                              animate={{ strokeDashoffset: offset }}
-                              transition={{ duration: 1, delay: 0.7 }}
-                              cx="50"
-                              cy="50"
-                              r={radius}
-                              fill="none"
-                              stroke="#F59E0B"
-                              strokeWidth="20"
-                              strokeDasharray={`${izinLength} ${circumference}`}
-                              strokeDashoffset={offset}
-                              strokeLinecap="round"
-                            />
-                          );
-                        })()}
-                        
-                        {/* Absen - Red */}
-                        {attendanceStats.absen > 0 && (() => {
-                          offset -= izinLength;
-                          return (
-                            <motion.circle
-                              initial={{ strokeDashoffset: circumference }}
-                              animate={{ strokeDashoffset: offset }}
-                              transition={{ duration: 1, delay: 0.9 }}
-                              cx="50"
-                              cy="50"
-                              r={radius}
-                              fill="none"
-                              stroke="#EF4444"
-                              strokeWidth="20"
-                              strokeDasharray={`${absenLength} ${circumference}`}
-                              strokeDashoffset={offset}
-                              strokeLinecap="round"
-                            />
-                          );
-                        })()}
-                      </>
-                    );
-                  })()}
-                </svg>
-
-                {/* Center Text */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <p className="text-3xl font-bold text-gray-900">{stats.totalEmployees}</p>
-                  <p className="text-sm text-gray-600 font-medium">Total Karyawan</p>
-                </div>
-              </div>
-
-              {/* Legend */}
-              <div className="ml-8 space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 bg-green-500 rounded-full"></div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Hadir</p>
-                    <p className="text-2xl font-bold text-green-600">{attendanceStats.hadir}</p>
-                    <p className="text-xs text-gray-500">
-                      {stats.totalEmployees > 0 
-                        ? `${Math.round((attendanceStats.hadir / stats.totalEmployees) * 100)}%`
-                        : '0%'
-                      }
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Izin</p>
-                    <p className="text-2xl font-bold text-yellow-600">{attendanceStats.izin}</p>
-                    <p className="text-xs text-gray-500">
-                      {stats.totalEmployees > 0 
-                        ? `${Math.round((attendanceStats.izin / stats.totalEmployees) * 100)}%`
-                        : '0%'
-                      }
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">Absen</p>
-                    <p className="text-2xl font-bold text-red-600">{attendanceStats.absen}</p>
-                    <p className="text-xs text-gray-500">
-                      {stats.totalEmployees > 0 
-                        ? `${Math.round((attendanceStats.absen / stats.totalEmployees) * 100)}%`
-                        : '0%'
-                      }
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+          {/* Attendance Trend Chart */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="bg-white rounded-xl shadow-sm p-6"
+          >
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">Trend Kehadiran & Keterlambatan (30 Hari)</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={trendData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="date" 
+                  tick={{ fontSize: 10 }}
+                  interval="preserveStartEnd"
+                />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#fff', 
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: '14px' }} />
+                <Line 
+                  type="monotone" 
+                  dataKey="hadir" 
+                  stroke="#10B981" 
+                  strokeWidth={2}
+                  dot={{ fill: '#10B981', r: 3 }}
+                  name="Hadir"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="terlambat" 
+                  stroke="#F59E0B" 
+                  strokeWidth={2}
+                  dot={{ fill: '#F59E0B', r: 3 }}
+                  name="Terlambat"
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="absen" 
+                  stroke="#EF4444" 
+                  strokeWidth={2}
+                  dot={{ fill: '#EF4444', r: 3 }}
+                  name="Absen"
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </motion.div>
         </div>
 

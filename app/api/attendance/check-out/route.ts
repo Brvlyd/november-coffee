@@ -28,7 +28,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Get active shift (checked in but not checked out) for current shift
-    const today = new Date().toISOString().split('T')[0];
+    // Gunakan timezone Indonesia (WIB)
+    const now = new Date();
+    // Konversi ke WIB dengan offset +7 jam
+    const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+    const today = wibTime.toISOString().split('T')[0];
     const currentShift = getCurrentShift();
 
     const { data: activeShifts, error: shiftError } = await supabase

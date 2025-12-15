@@ -25,6 +25,7 @@ interface NotaData {
 
 interface InventoryItem {
   id: string;
+  kode_barang: string;
   nama_barang: string;
   jumlah: number;
   kategori: string;

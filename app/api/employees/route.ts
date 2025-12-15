@@ -1,9 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+// Function to update employee status based on recent attendance
+async function updateEmployeeStatuses() {
+  try {
+    // Get all employees except admin
+    const { data: employees } = await supabase
+      .from('employees')
+      .select('id, employee_id, position')
+      .neq('position', 'Admin');
+
+    if (!employees) return;
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+
+    for (const employee of employees) {
+      // Skip Manager - Manager always stays Active
+      if (employee.position === 'Manager') {
+        await supabase
+          .from('employees')
+          .update({ employment_status: 'Active' })
+          .eq('id', employee.id);
+        continue;
+      }
+
+      // Check if employee has attendance in last 7 days
+      const { data: recentAttendance } = await supabase
+        .from('attendance')
+        .select('id')
+        .eq('employee_id', employee.id)
+        .gte('date', sevenDaysAgoStr)
+        .limit(1);
+
+      const newStatus = recentAttendance && recentAttendance.length > 0 ? 'Active' : 'Inactive';
+
+      // Update employee status
+      await supabase
+        .from('employees')
+        .update({ employment_status: newStatus })
+        .eq('id', employee.id);
+    }
+  } catch (error) {
+    console.error('Error updating employee statuses:', error);
+  }
+}
+
 // GET all employees
 export async function GET() {
   try {
+    // Update statuses before fetching
+    await updateEmployeeStatuses();
+
     const { data, error } = await supabase
       .from('employees')
       .select('*')
@@ -93,7 +142,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, employee_id, full_name, position, employment_status, email, password } = body;
+    const { id, employee_id, full_name, position, employment_status, email, password, join_date } = body;
 
     if (!id || !employee_id || !full_name || !position) {
       return NextResponse.json(
@@ -138,9 +187,15 @@ export async function PUT(request: NextRequest) {
       employee_id,
       full_name, 
       position, 
-      employment_status: employment_status || 'Aktif',
+      // Force Manager to always be Active
+      employment_status: position === 'Manager' ? 'Active' : (employment_status || 'Aktif'),
       email: email || null
     };
+
+    // Only update join_date if provided and valid
+    if (join_date) {
+      updateData.join_date = join_date;
+    }
 
     // Only update password if provided
     if (password) {
@@ -154,13 +209,16 @@ export async function PUT(request: NextRequest) {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error:', error);
+      throw error;
+    }
 
     return NextResponse.json({ data });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating employee:', error);
     return NextResponse.json(
-      { error: 'Gagal mengupdate karyawan' },
+      { error: error.message || 'Gagal mengupdate karyawan' },
       { status: 500 }
     );
   }

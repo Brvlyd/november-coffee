@@ -8,10 +8,12 @@ import { toast } from 'react-hot-toast';
 
 interface InventoryItem {
   id: string;
+  kode_barang: string;
   nama_barang: string;
   jumlah: number;
   kategori: string;
   catatan: string;
+  nama_toko: string;
   created_at: string;
 }
 
@@ -34,6 +36,7 @@ export default function DetailBarangPage() {
     jumlah: 0,
     kategori: '',
     catatan: '',
+    nama_toko: '',
   });
 
   React.useEffect(() => {
@@ -54,6 +57,7 @@ export default function DetailBarangPage() {
             jumlah: foundItem.jumlah,
             kategori: foundItem.kategori,
             catatan: foundItem.catatan || '',
+            nama_toko: foundItem.nama_toko || '',
           });
         } else {
           toast.error('Barang tidak ditemukan');
@@ -241,6 +245,7 @@ export default function DetailBarangPage() {
                     jumlah: item.jumlah,
                     kategori: item.kategori,
                     catatan: item.catatan || '',
+                    nama_toko: item.nama_toko || '',
                   });
                 }}
                 className="flex items-center gap-2 px-6 py-3 bg-gray-600 text-white rounded-lg font-semibold hover:bg-gray-700 transition-colors"
@@ -448,25 +453,27 @@ export default function DetailBarangPage() {
             <h3 className="text-lg font-bold text-gray-900 mb-4">Informasi Sistem</h3>
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <Calendar className="w-5 h-5 text-gray-600" />
-                <div>
-                  <p className="text-sm text-gray-600">Tanggal Input</p>
-                  <p className="font-bold text-gray-900">
-                    {new Date(item.created_at).toLocaleDateString('id-ID', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </p>
+                <Info className="w-5 h-5 text-gray-600" />
+                <div className="flex-1">
+                  <p className="text-sm text-gray-600">ID Barang</p>
+                  <p className="font-mono text-lg font-bold text-[#C84B31]">{item.kode_barang || '-'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <Info className="w-5 h-5 text-gray-600" />
-                <div>
-                  <p className="text-sm text-gray-600">ID Barang</p>
-                  <p className="font-mono text-sm font-bold text-gray-900">{item.id.slice(0, 8)}...</p>
+                <Calendar className="w-5 h-5 text-gray-600" />
+                <div className="flex-1">
+                  <p className="text-sm text-gray-600">Nama Toko</p>
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editData.nama_toko}
+                      onChange={(e) => setEditData({ ...editData, nama_toko: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] text-gray-900 font-medium text-sm mt-1"
+                      placeholder="Masukkan nama toko"
+                    />
+                  ) : (
+                    <p className="font-bold text-gray-900">{item.nama_toko || '-'}</p>
+                  )}
                 </div>
               </div>
             </div>

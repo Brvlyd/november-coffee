@@ -14,14 +14,16 @@ interface Employee {
   employment_status: string;
   email: string;
   created_at: string;
+  join_date: string;
 }
 
 interface AttendanceRecord {
   id: string;
   date: string;
-  check_in: string;
-  check_out: string | null;
+  check_in_at: string;
+  check_out_at: string | null;
   status: string;
+  shift_id: number;
 }
 
 interface WeeklyData {
@@ -52,6 +54,7 @@ export default function EmployeeDetailPage() {
     employment_status: '',
     email: '',
     password: '',
+    join_date: '',
   });
 
   React.useEffect(() => {
@@ -85,6 +88,7 @@ export default function EmployeeDetailPage() {
             employment_status: emp.employment_status,
             email: emp.email,
             password: '',
+            join_date: emp.join_date || emp.created_at,
           });
         } else {
           toast.error('Karyawan tidak ditemukan');
@@ -154,17 +158,35 @@ export default function EmployeeDetailPage() {
     let totalLateMinutes = 0;
 
     currentWeekAttendance.forEach((record) => {
-      if (record.check_in && record.check_out) {
+      // Count shift if check_in_at exists (regardless of check_out status)
+      if (record.check_in_at) {
         totalShifts++;
         
-        // Calculate late minutes
-        const checkInTime = new Date(record.check_in);
-        const expectedTime = new Date(record.check_in);
-        expectedTime.setHours(8, 0, 0, 0); // Assuming 8:00 AM is start time
+        // Calculate late minutes based on shift_id
+        const checkInTime = new Date(record.check_in_at);
+        const checkInHour = checkInTime.getUTCHours() + 7; // Convert to WIB
+        const checkInMinute = checkInTime.getUTCMinutes();
+        const actualTimeInMinutes = (checkInHour % 24) * 60 + checkInMinute;
         
-        if (checkInTime > expectedTime) {
-          const lateMs = checkInTime.getTime() - expectedTime.getTime();
-          totalLateMinutes += Math.floor(lateMs / (1000 * 60));
+        let shiftStartTimeInMinutes = 0;
+        let lateThresholdMinutes = 0;
+        
+        // Determine shift start time and late threshold (5 minutes after shift start)
+        if (record.shift_id === 1) { // Pagi 11:00
+          shiftStartTimeInMinutes = 11 * 60; // 11:00
+          lateThresholdMinutes = shiftStartTimeInMinutes + 5; // 11:05
+        } else if (record.shift_id === 2) { // Malam 19:00
+          shiftStartTimeInMinutes = 19 * 60; // 19:00
+          lateThresholdMinutes = shiftStartTimeInMinutes + 5; // 19:05
+        } else if (record.shift_id === 3) { // Dini Hari 03:00
+          shiftStartTimeInMinutes = 3 * 60; // 03:00
+          lateThresholdMinutes = shiftStartTimeInMinutes + 5; // 03:05
+        }
+        
+        // Check if late (checked in after the 5-minute grace period)
+        if (actualTimeInMinutes > lateThresholdMinutes) {
+          const lateMinutes = actualTimeInMinutes - lateThresholdMinutes;
+          totalLateMinutes += lateMinutes;
         }
       }
     });
@@ -202,13 +224,17 @@ export default function EmployeeDetailPage() {
     }
 
     try {
+      // Force Manager status to always be Active
+      const dataToUpdate = {
+        id: employee.id,
+        ...formData,
+        employment_status: employee.position === 'Manager' ? 'Active' : formData.employment_status
+      };
+
       const response = await fetch('/api/employees', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: employee.id,
-          ...formData,
-        }),
+        body: JSON.stringify(dataToUpdate),
       });
 
       const result = await response.json();
@@ -301,7 +327,7 @@ export default function EmployeeDetailPage() {
   const calculateWorkDuration = () => {
     if (!employee) return '';
     
-    const startDate = new Date(employee.created_at);
+    const startDate = new Date(employee.join_date || employee.created_at);
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - startDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -403,6 +429,7 @@ export default function EmployeeDetailPage() {
                   employment_status: employee.employment_status,
                   email: employee.email,
                   password: '',
+                  join_date: employee.join_date || employee.created_at,
                 });
               }}
               className="flex items-center gap-2 bg-gray-200 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-300 transition-colors font-semibold"
@@ -421,9 +448,9 @@ export default function EmployeeDetailPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={`grid gap-6 ${employee.position === 'Manager' ? 'grid-cols-1 max-w-2xl mx-auto' : 'grid-cols-1 lg:grid-cols-3'}`}>
         {/* Employee Info Card */}
-        <div className="lg:col-span-1">
+        <div className={employee.position === 'Manager' ? '' : 'lg:col-span-1'}>
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -481,7 +508,7 @@ export default function EmployeeDetailPage() {
                     <Calendar className="w-5 h-5 mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
                       <p className="text-sm text-white/80 font-semibold">Tanggal Bergabung</p>
-                      <p className="font-medium">{formatDate(employee.created_at)}</p>
+                      <p className="font-medium">{formatDate(employee.join_date || employee.created_at)}</p>
                     </div>
                   </div>
                 </div>
@@ -540,6 +567,27 @@ export default function EmployeeDetailPage() {
 
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2">
+                    Status Karyawan
+                  </label>
+                  <select
+                    value={formData.employment_status}
+                    onChange={(e) => setFormData({ ...formData, employment_status: e.target.value })}
+                    disabled={employee.position === 'Manager'}
+                    className={`w-full px-4 py-2 border-2 border-white/30 bg-white/10 backdrop-blur-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-white text-white font-medium ${
+                      employee.position === 'Manager' ? 'opacity-60 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    <option value="Active" className="text-gray-900">Active</option>
+                    <option value="Inactive" className="text-gray-900">Inactive</option>
+                    <option value="On Leave" className="text-gray-900">On Leave</option>
+                  </select>
+                  {employee.position === 'Manager' && (
+                    <p className="mt-1 text-xs text-white/70">Manager selalu berstatus Active</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-2">
                     Email
                   </label>
                   <input
@@ -548,6 +596,19 @@ export default function EmployeeDetailPage() {
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full px-4 py-2 border-2 border-white/30 bg-white/10 backdrop-blur-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-white text-white font-medium placeholder:text-white/50"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-2">
+                    Tanggal Bergabung
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.join_date ? new Date(formData.join_date).toISOString().split('T')[0] : ''}
+                    onChange={(e) => setFormData({ ...formData, join_date: e.target.value })}
+                    className="w-full px-4 py-2 border-2 border-white/30 bg-white/10 backdrop-blur-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-white text-white font-medium placeholder:text-white/50"
+                  />
+                  <p className="mt-1 text-xs text-white/70">Tanggal ini akan digunakan untuk menghitung lama bekerja</p>
                 </div>
 
                 <div>
@@ -595,14 +656,15 @@ export default function EmployeeDetailPage() {
           </motion.div>
         </div>
 
-        {/* Current Week Attendance & Salary */}
-        <div className="lg:col-span-2">
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="bg-white rounded-2xl shadow-lg p-6"
-          >
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Absensi & Gaji Minggu Ini</h2>
+        {/* Current Week Attendance & Salary - Hide for Manager */}
+        {employee.position !== 'Manager' && (
+          <div className="lg:col-span-2">
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="bg-white rounded-2xl shadow-lg p-6"
+            >
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Absensi & Gaji Minggu Ini</h2>
             
             {!currentWeekData ? (
               <div className="text-center py-12 text-gray-500">
@@ -672,11 +734,11 @@ export default function EmployeeDetailPage() {
                             <div className="flex items-center gap-6 text-sm">
                               <div>
                                 <span className="text-gray-600 font-semibold">Check In: </span>
-                                <span className="text-gray-900 font-bold">{formatTime(record.check_in)}</span>
+                                <span className="text-gray-900 font-bold">{formatTime(record.check_in_at)}</span>
                               </div>
                               <div>
                                 <span className="text-gray-600 font-semibold">Check Out: </span>
-                                <span className="text-gray-900 font-bold">{formatTime(record.check_out)}</span>
+                                <span className="text-gray-900 font-bold">{formatTime(record.check_out_at)}</span>
                               </div>
                             </div>
                           </div>
@@ -709,6 +771,7 @@ export default function EmployeeDetailPage() {
             )}
           </motion.div>
         </div>
+        )}
       </div>
     </div>
   );

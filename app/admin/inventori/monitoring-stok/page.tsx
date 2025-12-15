@@ -8,6 +8,7 @@ import { toast } from 'react-hot-toast';
 
 interface InventoryItem {
   id: string;
+  kode_barang: string;
   nama_barang: string;
   jumlah: number;
   kategori: string;
@@ -190,6 +191,7 @@ export default function MonitoringStokPage() {
           <table className="w-full">
             <thead className="bg-[#C84B31] text-white">
               <tr>
+                <th className="px-6 py-4 text-left text-sm font-bold">ID</th>
                 <th className="px-6 py-4 text-left text-sm font-bold">NAMA BARANG</th>
                 <th className="px-6 py-4 text-left text-sm font-bold">KATEGORI</th>
                 <th className="px-6 py-4 text-center text-sm font-bold">JUMLAH</th>
@@ -200,7 +202,7 @@ export default function MonitoringStokPage() {
             <tbody className="divide-y divide-gray-200">
               {filteredInventory.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                     <Package className="w-12 h-12 mx-auto mb-2 text-gray-300" />
                     <p>Tidak ada data inventori</p>
                   </td>
@@ -217,6 +219,11 @@ export default function MonitoringStokPage() {
                       onClick={() => handleItemClick(item.id)}
                       className="hover:bg-gray-50 transition-colors cursor-pointer"
                     >
+                      <td className="px-6 py-4">
+                        <span className="font-mono text-sm font-bold text-[#C84B31]">
+                          {item.kode_barang || '-'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-gradient-to-br from-[#D9603B] to-[#C84B31] rounded-lg flex items-center justify-center">

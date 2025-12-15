@@ -1,6 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+// Function to generate next item code
+async function generateItemCode(): Promise<string> {
+  try {
+    const { data, error } = await supabase
+      .from('inventori')
+      .select('kode_barang')
+      .order('kode_barang', { ascending: false })
+      .limit(1);
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      return 'BRG0001';
+    }
+
+    const lastCode = data[0].kode_barang;
+    if (!lastCode || !lastCode.startsWith('BRG')) {
+      return 'BRG0001';
+    }
+
+    const lastNumber = parseInt(lastCode.substring(3));
+    const nextNumber = lastNumber + 1;
+    return `BRG${String(nextNumber).padStart(4, '0')}`;
+  } catch (error) {
+    console.error('Error generating item code:', error);
+    return 'BRG0001';
+  }
+}
+
 // GET all inventory items
 export async function GET() {
   try {
@@ -34,9 +63,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Generate kode barang
+    const kode_barang = await generateItemCode();
+
     const { data, error } = await supabase
       .from('inventori')
-      .insert({ nama_barang, jumlah, kategori, catatan })
+      .insert({ kode_barang, nama_barang, jumlah, kategori, catatan })
       .select()
       .single();
 
@@ -56,7 +88,7 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, nama_barang, jumlah, kategori, catatan } = body;
+    const { id, nama_barang, jumlah, kategori, catatan, nama_toko } = body;
 
     if (!id || !nama_barang || jumlah === undefined) {
       return NextResponse.json(
@@ -67,7 +99,7 @@ export async function PUT(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('inventori')
-      .update({ nama_barang, jumlah, kategori, catatan })
+      .update({ nama_barang, jumlah, kategori, catatan, nama_toko })
       .eq('id', id)
       .select()
       .single();

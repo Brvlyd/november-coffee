@@ -6,7 +6,8 @@ export async function POST(request: NextRequest) {
   try {
     const { employeeId, password } = await request.json();
 
-    console.log('Login attempt:', { employeeId, password: password ? '***' : 'empty' });
+    // Log login attempt without sensitive data
+    console.log('Login attempt for employee:', employeeId);
 
     if (!employeeId || !password) {
       return NextResponse.json(
@@ -33,8 +34,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if manager based on position
-    if (employee.position === 'admin' || employee.position === 'Admin') {
+    // Check if manager or admin based on position
+    if (employee.position === 'admin' || employee.position === 'Admin' || employee.position === 'Manager') {
       return NextResponse.json({
         success: true,
         role: 'admin',

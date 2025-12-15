@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Search, User } from 'lucide-react';
+import { Plus, Search, User, Filter, Calendar } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 
@@ -24,6 +24,11 @@ export default function EmployeesPage() {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [idError, setIdError] = React.useState('');
   const [isGeneratingIds, setIsGeneratingIds] = React.useState(false);
+  const [filterWeek, setFilterWeek] = React.useState<'all' | 'current' | 'last1' | 'last2' | 'last3'>('all');
+  const [attendance, setAttendance] = React.useState<any[]>([]);
+  const [employeesWithAttendance, setEmployeesWithAttendance] = React.useState<Set<string>>(new Set());
+  const [selectedWeekInfo, setSelectedWeekInfo] = React.useState<string>('');
+  const [weekRanges, setWeekRanges] = React.useState<{ [key: string]: string }>({});
   const router = useRouter();
   
   const [formData, setFormData] = React.useState({
@@ -55,7 +60,99 @@ export default function EmployeesPage() {
 
   React.useEffect(() => {
     fetchEmployees();
+    fetchAttendance();
+    calculateAllWeekRanges();
   }, []);
+
+  React.useEffect(() => {
+    if (filterWeek !== 'all') {
+      processWeekAttendance(filterWeek);
+    }
+  }, [attendance, filterWeek]);
+
+  const getWeekRange = (weeksAgo: number): { start: Date; end: Date } => {
+    const now = new Date();
+    const currentDay = now.getDay();
+    
+    // Calculate days to subtract to get to Monday of current week
+    // If Sunday (0), go back 6 days; if Monday (1), go back 0 days; etc.
+    const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+    
+    // Get Monday of current week
+    const currentWeekMonday = new Date(now);
+    currentWeekMonday.setDate(now.getDate() - daysToMonday);
+    currentWeekMonday.setHours(0, 0, 0, 0);
+    
+    // Subtract weeks to get the target Monday
+    const targetWeekMonday = new Date(currentWeekMonday);
+    targetWeekMonday.setDate(currentWeekMonday.getDate() - (weeksAgo * 7));
+    
+    // Get Sunday of target week (6 days after Monday)
+    const targetWeekSunday = new Date(targetWeekMonday);
+    targetWeekSunday.setDate(targetWeekMonday.getDate() + 6);
+    targetWeekSunday.setHours(23, 59, 59, 999);
+    
+    return { start: targetWeekMonday, end: targetWeekSunday };
+  };
+
+  const formatDateShort = (date: Date) => {
+    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+  };
+
+  const calculateAllWeekRanges = () => {
+    const ranges: { [key: string]: string } = {};
+    
+    for (let i = 0; i <= 3; i++) {
+      const { start, end } = getWeekRange(i);
+      const key = i === 0 ? 'current' : `last${i}`;
+      ranges[key] = `${formatDateShort(start)} - ${formatDateShort(end)}`;
+    }
+    
+    setWeekRanges(ranges);
+  };
+
+  const getCurrentWeekStart = (): Date => {
+    return getWeekRange(0).start;
+  };
+
+  const getCurrentWeekEnd = (): Date => {
+    return getWeekRange(0).end;
+  };
+
+  const processWeekAttendance = (weekType: 'current' | 'last1' | 'last2' | 'last3') => {
+    const weeksAgo = weekType === 'current' ? 0 : weekType === 'last1' ? 1 : weekType === 'last2' ? 2 : 3;
+    const { start: weekStart, end: weekEnd } = getWeekRange(weeksAgo);
+
+    const employeesInWeek = new Set<string>();
+
+    attendance.forEach((record: any) => {
+      const recordDate = new Date(record.date);
+      if (recordDate >= weekStart && recordDate <= weekEnd && record.check_in) {
+        employeesInWeek.add(record.employee_id);
+      }
+    });
+
+    setEmployeesWithAttendance(employeesInWeek);
+    
+    // Set week info for display
+    const formatDate = (date: Date) => {
+      return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+    };
+    setSelectedWeekInfo(`${formatDate(weekStart)} - ${formatDate(weekEnd)}`);
+  };
+
+  const fetchAttendance = async () => {
+    try {
+      const response = await fetch('/api/attendance');
+      const result = await response.json();
+      
+      if (response.ok) {
+        setAttendance(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch attendance');
+    }
+  };
 
   const fetchEmployees = async () => {
     try {
@@ -284,11 +381,16 @@ export default function EmployeesPage() {
     }
   };
 
-  const filteredEmployees = employees.filter(emp =>
-    emp.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.employee_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    emp.position?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredEmployees = employees.filter(emp => {
+    const matchesSearch = emp.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.employee_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.position?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesWeekFilter = filterWeek === 'all' || 
+      (filterWeek === 'current' && employeesWithAttendance.has(emp.id));
+    
+    return matchesSearch && matchesWeekFilter;
+  });
 
   if (loading) {
     return (
@@ -324,6 +426,120 @@ export default function EmployeesPage() {
         </div>
       </div>
 
+      {/* Filter Minggu */}
+      <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <Filter className="w-5 h-5 text-gray-600" />
+            <span className="text-sm font-semibold text-gray-700">Filter Periode Kerja:</span>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setFilterWeek('all')}
+              className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${
+                filterWeek === 'all'
+                  ? 'bg-[#C84B31] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Semua Karyawan
+            </button>
+            <button
+              onClick={() => setFilterWeek('current')}
+              className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-colors flex flex-col items-start gap-0.5 min-w-[140px] ${
+                filterWeek === 'current'
+                  ? 'bg-[#C84B31] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <div className="flex items-center gap-2 w-full">
+                <Calendar className="w-4 h-4" />
+                <span>Minggu Ini</span>
+                {filterWeek === 'current' && (
+                  <span className="bg-white text-[#C84B31] px-2 py-0.5 rounded-full text-xs font-bold ml-auto">
+                    {employeesWithAttendance.size}
+                  </span>
+                )}
+              </div>
+              <span className={`text-xs ml-6 ${
+                filterWeek === 'current' ? 'text-white/80' : 'text-gray-500'
+              }`}>
+                {weekRanges.current || 'Loading...'}
+              </span>
+            </button>
+            <button
+              onClick={() => setFilterWeek('last1')}
+              className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-colors flex flex-col items-start gap-0.5 min-w-[140px] ${
+                filterWeek === 'last1'
+                  ? 'bg-[#C84B31] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <div className="flex items-center gap-2 w-full">
+                <Calendar className="w-4 h-4" />
+                <span>1 Minggu Lalu</span>
+                {filterWeek === 'last1' && (
+                  <span className="bg-white text-[#C84B31] px-2 py-0.5 rounded-full text-xs font-bold ml-auto">
+                    {employeesWithAttendance.size}
+                  </span>
+                )}
+              </div>
+              <span className={`text-xs ml-6 ${
+                filterWeek === 'last1' ? 'text-white/80' : 'text-gray-500'
+              }`}>
+                {weekRanges.last1 || 'Loading...'}
+              </span>
+            </button>
+            <button
+              onClick={() => setFilterWeek('last2')}
+              className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-colors flex flex-col items-start gap-0.5 min-w-[140px] ${
+                filterWeek === 'last2'
+                  ? 'bg-[#C84B31] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <div className="flex items-center gap-2 w-full">
+                <Calendar className="w-4 h-4" />
+                <span>2 Minggu Lalu</span>
+                {filterWeek === 'last2' && (
+                  <span className="bg-white text-[#C84B31] px-2 py-0.5 rounded-full text-xs font-bold ml-auto">
+                    {employeesWithAttendance.size}
+                  </span>
+                )}
+              </div>
+              <span className={`text-xs ml-6 ${
+                filterWeek === 'last2' ? 'text-white/80' : 'text-gray-500'
+              }`}>
+                {weekRanges.last2 || 'Loading...'}
+              </span>
+            </button>
+            <button
+              onClick={() => setFilterWeek('last3')}
+              className={`px-4 py-2.5 rounded-lg font-semibold text-sm transition-colors flex flex-col items-start gap-0.5 min-w-[140px] ${
+                filterWeek === 'last3'
+                  ? 'bg-[#C84B31] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <div className="flex items-center gap-2 w-full">
+                <Calendar className="w-4 h-4" />
+                <span>3 Minggu Lalu</span>
+                {filterWeek === 'last3' && (
+                  <span className="bg-white text-[#C84B31] px-2 py-0.5 rounded-full text-xs font-bold ml-auto">
+                    {employeesWithAttendance.size}
+                  </span>
+                )}
+              </div>
+              <span className={`text-xs ml-6 ${
+                filterWeek === 'last3' ? 'text-white/80' : 'text-gray-500'
+              }`}>
+                {weekRanges.last3 || 'Loading...'}
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Search Bar */}
       <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
         <div className="relative">
@@ -346,8 +562,15 @@ export default function EmployeesPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05 }}
-            className="bg-gradient-to-br from-[#E07856] to-[#D96846] rounded-2xl shadow-lg hover:shadow-xl transition-all p-6"
+            className="bg-gradient-to-br from-[#E07856] to-[#D96846] rounded-2xl shadow-lg hover:shadow-xl transition-all p-6 relative"
           >
+            {/* Badge Bekerja Minggu Ini */}
+            {employeesWithAttendance.has(employee.id) && (
+              <div className="absolute top-4 right-4 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md">
+                ✓ Minggu Ini
+              </div>
+            )}
+            
             {/* Avatar */}
             <div className="flex justify-center mb-4">
               <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-md ring-4 ring-white/30">
@@ -360,19 +583,11 @@ export default function EmployeesPage() {
               <h3 className="text-xl font-bold text-white mb-2">{employee.full_name}</h3>
               <p className="text-white/90 text-sm font-medium mb-4">{employee.position}</p>
               
-              {/* Shift and Status Table */}
+              {/* Status */}
               <div className="bg-white/10 backdrop-blur-sm rounded-lg overflow-hidden mb-4">
-                <div className="grid grid-cols-2 divide-x divide-white/20">
-                  <div className="px-3 py-2">
-                    <p className="text-white/80 text-xs font-semibold mb-1">Shift</p>
-                    <p className="text-white text-sm font-bold">
-                      {employee.employment_status === 'Active' ? 'Pagi' : '-'}
-                    </p>
-                  </div>
-                  <div className="px-3 py-2">
-                    <p className="text-white/80 text-xs font-semibold mb-1">Status</p>
-                    <p className="text-white text-sm font-bold">{employee.employment_status}</p>
-                  </div>
+                <div className="px-4 py-3">
+                  <p className="text-white/80 text-xs font-semibold mb-1">Status</p>
+                  <p className="text-white text-base font-bold">{employee.employment_status}</p>
                 </div>
               </div>
             </div>

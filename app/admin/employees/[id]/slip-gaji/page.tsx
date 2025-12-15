@@ -19,9 +19,10 @@ interface Employee {
 interface AttendanceRecord {
   id: string;
   date: string;
-  check_in: string;
-  check_out: string | null;
+  check_in_at: string;
+  check_out_at: string | null;
   status: string;
+  shift_id: number;
 }
 
 interface WeeklyData {
@@ -118,16 +119,35 @@ export default function SalarySlipPage() {
     let totalLateMinutes = 0;
 
     currentWeekAttendance.forEach((record) => {
-      if (record.check_in && record.check_out) {
+      // Count shift if check_in_at exists (regardless of check_out status)
+      if (record.check_in_at) {
         totalShifts++;
         
-        const checkInTime = new Date(record.check_in);
-        const expectedTime = new Date(record.check_in);
-        expectedTime.setHours(8, 0, 0, 0);
+        // Calculate late minutes based on shift_id
+        const checkInTime = new Date(record.check_in_at);
+        const checkInHour = checkInTime.getUTCHours() + 7; // Convert to WIB
+        const checkInMinute = checkInTime.getUTCMinutes();
+        const actualTimeInMinutes = (checkInHour % 24) * 60 + checkInMinute;
         
-        if (checkInTime > expectedTime) {
-          const lateMs = checkInTime.getTime() - expectedTime.getTime();
-          totalLateMinutes += Math.floor(lateMs / (1000 * 60));
+        let shiftStartTimeInMinutes = 0;
+        let lateThresholdMinutes = 0;
+        
+        // Determine shift start time and late threshold (5 minutes after shift start)
+        if (record.shift_id === 1) { // Pagi 11:00
+          shiftStartTimeInMinutes = 11 * 60; // 11:00
+          lateThresholdMinutes = shiftStartTimeInMinutes + 5; // 11:05
+        } else if (record.shift_id === 2) { // Malam 19:00
+          shiftStartTimeInMinutes = 19 * 60; // 19:00
+          lateThresholdMinutes = shiftStartTimeInMinutes + 5; // 19:05
+        } else if (record.shift_id === 3) { // Dini Hari 03:00
+          shiftStartTimeInMinutes = 3 * 60; // 03:00
+          lateThresholdMinutes = shiftStartTimeInMinutes + 5; // 03:05
+        }
+        
+        // Check if late (checked in after the 5-minute grace period)
+        if (actualTimeInMinutes > lateThresholdMinutes) {
+          const lateMinutes = actualTimeInMinutes - lateThresholdMinutes;
+          totalLateMinutes += lateMinutes;
         }
       }
     });
@@ -383,11 +403,11 @@ Dicetak pada: ${new Date().toLocaleString('id-ID')}
                     <div className="flex items-center gap-4 text-sm">
                       <div>
                         <span className="text-gray-600 font-semibold">Masuk: </span>
-                        <span className="text-gray-900 font-bold">{formatTime(record.check_in)}</span>
+                        <span className="text-gray-900 font-bold">{formatTime(record.check_in_at)}</span>
                       </div>
                       <div>
                         <span className="text-gray-600 font-semibold">Keluar: </span>
-                        <span className="text-gray-900 font-bold">{formatTime(record.check_out)}</span>
+                        <span className="text-gray-900 font-bold">{formatTime(record.check_out_at)}</span>
                       </div>
                     </div>
                   </div>
