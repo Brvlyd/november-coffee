@@ -28,7 +28,7 @@ interface DailyAttendance {
   };
 }
 
-export default function AdminDashboard() {
+export default function ManagerDashboard() {
   const router = useRouter();
   const [stats, setStats] = React.useState<Stats>({
     totalEmployees: 0,
@@ -203,7 +203,7 @@ export default function AdminDashboard() {
     // Jika hanya 0, 1, atau 2 pegawai yang hadir/izin, langsung merah
     if (totalAttendance <= 2) return 'bg-red-100 hover:bg-red-200 border border-red-300';
     
-    // Gunakan nilai tengah dari total karyawan (non-admin)
+    // Gunakan nilai tengah dari total karyawan (non-manager)
     const totalEmployees = stats.totalEmployees;
     const midpoint = totalEmployees / 2;
     
@@ -337,7 +337,7 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
-        <p className="text-gray-600">Selamat datang di November Coffee Admin Panel</p>
+        <p className="text-gray-600">Selamat datang di November Coffee Manager Panel</p>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">

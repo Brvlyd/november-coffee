@@ -216,13 +216,24 @@ export default function EmployeesPage() {
                 <Edit className="w-4 h-4" />
                 Edit
               </button>
-              <button
-                onClick={() => handleDelete(employee.id)}
-                className="flex-1 flex items-center justify-center gap-2 bg-red-50 text-red-600 py-2 rounded-lg hover:bg-red-100 transition-colors font-semibold"
-              >
-                <Trash2 className="w-4 h-4" />
-                Hapus
-              </button>
+              {employee.position.toLowerCase() !== 'manager' ? (
+                <button
+                  onClick={() => handleDelete(employee.id)}
+                  className="flex-1 flex items-center justify-center gap-2 bg-red-50 text-red-600 py-2 rounded-lg hover:bg-red-100 transition-colors font-semibold"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Hapus
+                </button>
+              ) : (
+                <button
+                  disabled
+                  className="flex-1 flex items-center justify-center gap-2 bg-gray-100 text-gray-400 py-2 rounded-lg cursor-not-allowed font-semibold"
+                  title="Manager tidak dapat dihapus"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Hapus
+                </button>
+              )}
             </div>
           </motion.div>
         ))}

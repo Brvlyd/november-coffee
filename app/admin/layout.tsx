@@ -58,7 +58,7 @@ const menuItems = [
   },
 ];
 
-export default function AdminLayout({
+export default function ManagerLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -119,7 +119,7 @@ export default function AdminLayout({
             </div>
             <div>
               <h1 className="text-white font-bold text-xl">November</h1>
-              <p className="text-white/70 text-sm">Admin Panel</p>
+              <p className="text-white/70 text-sm">Manager Panel</p>
             </div>
           </div>
         </div>
@@ -206,8 +206,8 @@ export default function AdminLayout({
         {/* User Info & Logout */}
         <div className="p-4 border-t border-white/10 mt-auto">
           <div className="mb-3 px-4 py-2.5 bg-white/10 rounded-xl backdrop-blur-sm">
-            <p className="text-white font-semibold text-sm">Admin</p>
-            <p className="text-white/60 text-xs mt-0.5">Administrator</p>
+            <p className="text-white font-semibold text-sm">Manager</p>
+            <p className="text-white/60 text-xs mt-0.5">Manager</p>
           </div>
           <button
             onClick={handleLogout}

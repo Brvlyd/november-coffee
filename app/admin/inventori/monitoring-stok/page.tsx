@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Search, AlertTriangle, Package, TrendingDown } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -15,6 +16,7 @@ interface InventoryItem {
 }
 
 export default function MonitoringStokPage() {
+  const router = useRouter();
   const [inventory, setInventory] = React.useState<InventoryItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -22,6 +24,10 @@ export default function MonitoringStokPage() {
   React.useEffect(() => {
     fetchInventory();
   }, []);
+
+  const handleItemClick = (itemId: string) => {
+    router.push(`/admin/inventori/monitoring-stok/${itemId}`);
+  };
 
   const fetchInventory = async () => {
     try {
@@ -131,6 +137,39 @@ export default function MonitoringStokPage() {
         </motion.div>
       </div>
 
+      {/* Low Stock Alert */}
+      {lowStockItems.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 bg-yellow-50 border-l-4 border-yellow-500 p-6 rounded-lg"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-1" />
+            <div>
+              <h3 className="text-lg font-bold text-yellow-900 mb-2">
+                ⚠️ Peringatan Stok Menipis
+              </h3>
+              <p className="text-yellow-800 mb-3">
+                Terdapat {lowStockItems.length} item dengan stok menipis yang perlu segera direstock:
+              </p>
+              <ul className="space-y-1">
+                {lowStockItems.slice(0, 5).map(item => (
+                  <li key={item.id} className="text-yellow-900 font-medium">
+                    • {item.nama_barang} <span className="text-yellow-700">({item.jumlah} tersisa)</span>
+                  </li>
+                ))}
+                {lowStockItems.length > 5 && (
+                  <li className="text-yellow-700 italic">
+                    + {lowStockItems.length - 5} item lainnya
+                  </li>
+                )}
+              </ul>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Search Bar */}
       <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
         <div className="relative">
@@ -140,7 +179,7 @@ export default function MonitoringStokPage() {
             placeholder="Cari barang..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] focus:border-transparent text-gray-900"
           />
         </div>
       </div>
@@ -155,7 +194,7 @@ export default function MonitoringStokPage() {
                 <th className="px-6 py-4 text-left text-sm font-bold">KATEGORI</th>
                 <th className="px-6 py-4 text-center text-sm font-bold">JUMLAH</th>
                 <th className="px-6 py-4 text-center text-sm font-bold">STATUS</th>
-                <th className="px-6 py-4 text-left text-sm font-bold">CATATAN</th>
+                <th className="px-6 py-4 text-left text-sm font-bold w-64">CATATAN</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -175,7 +214,8 @@ export default function MonitoringStokPage() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
-                      className="hover:bg-gray-50 transition-colors"
+                      onClick={() => handleItemClick(item.id)}
+                      className="hover:bg-gray-50 transition-colors cursor-pointer"
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -203,8 +243,10 @@ export default function MonitoringStokPage() {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-600">
-                        {item.catatan || '-'}
+                      <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                        <div className="truncate" title={item.catatan || '-'}>
+                          {item.catatan || '-'}
+                        </div>
                       </td>
                     </motion.tr>
                   );
@@ -214,39 +256,6 @@ export default function MonitoringStokPage() {
           </table>
         </div>
       </div>
-
-      {/* Low Stock Alert */}
-      {lowStockItems.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-6 bg-yellow-50 border-l-4 border-yellow-500 p-6 rounded-lg"
-        >
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-1" />
-            <div>
-              <h3 className="text-lg font-bold text-yellow-900 mb-2">
-                ⚠️ Peringatan Stok Menipis
-              </h3>
-              <p className="text-yellow-800 mb-3">
-                Terdapat {lowStockItems.length} item dengan stok menipis yang perlu segera direstock:
-              </p>
-              <ul className="space-y-1">
-                {lowStockItems.slice(0, 5).map(item => (
-                  <li key={item.id} className="text-yellow-900 font-medium">
-                    • {item.nama_barang} <span className="text-yellow-700">({item.jumlah} tersisa)</span>
-                  </li>
-                ))}
-                {lowStockItems.length > 5 && (
-                  <li className="text-yellow-700 italic">
-                    + {lowStockItems.length - 5} item lainnya
-                  </li>
-                )}
-              </ul>
-            </div>
-          </div>
-        </motion.div>
-      )}
     </div>
   );
 }

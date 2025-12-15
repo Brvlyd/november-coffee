@@ -53,7 +53,7 @@ export default function LoginPage() {
         throw new Error(authData.error || 'Login gagal');
       }
 
-      // If admin, only allow check-in (which redirects to dashboard)
+      // If manager, only allow check-in (which redirects to dashboard)
       if (authData.role === 'admin') {
         if (type === 'checkout') {
           toast.error('Maaf, aksi yang dilakukan tidak valid');

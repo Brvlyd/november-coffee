@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if admin based on position
+    // Check if manager based on position
     if (employee.position === 'admin' || employee.position === 'Admin') {
       return NextResponse.json({
         success: true,

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { motion } from 'framer-motion';
-import { Upload, Plus, Package, Check } from 'lucide-react';
+import { Upload, Plus, Package, Check, Edit2, Save, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 type TabType = 'masuk' | 'keluar';
@@ -12,23 +12,37 @@ interface NotaItem {
   jumlah: number;
   satuan: string;
   kategori: string;
-  harga_satuan?: number;
-  harga_total?: number;
+  harga_satuan?: string;
+  harga_total?: string;
 }
 
 interface NotaData {
   items: NotaItem[];
   tanggal?: string;
   supplier?: string;
-  total?: number;
+  total?: string;
+}
+
+interface InventoryItem {
+  id: string;
+  nama_barang: string;
+  jumlah: number;
+  kategori: string;
+  catatan: string;
+  created_at: string;
 }
 
 export default function InputBarangPage() {
   const [activeTab, setActiveTab] = React.useState<TabType>('masuk');
   const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [isDragging, setIsDragging] = React.useState(false);
   const [notaData, setNotaData] = React.useState<NotaData | null>(null);
+  const [editingIndex, setEditingIndex] = React.useState<number | null>(null);
+  const [editingItem, setEditingItem] = React.useState<NotaItem | null>(null);
+  const [inventoryItems, setInventoryItems] = React.useState<InventoryItem[]>([]);
+  const [selectedInventoryItem, setSelectedInventoryItem] = React.useState<InventoryItem | null>(null);
   const [formData, setFormData] = React.useState({
     nama_barang: '',
     jumlah: 0,
@@ -36,10 +50,90 @@ export default function InputBarangPage() {
     catatan: '',
   });
 
+  React.useEffect(() => {
+    fetchInventoryItems();
+  }, []);
+
+  // Cleanup preview URL when component unmounts
+  React.useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const fetchInventoryItems = async () => {
+    try {
+      const response = await fetch('/api/inventori');
+      const result = await response.json();
+      if (response.ok) {
+        setInventoryItems(result.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching inventory:', error);
+    }
+  };
+
+  const handleInventoryItemSelect = (itemId: string) => {
+    const item = inventoryItems.find(i => i.id === itemId);
+    if (item) {
+      setSelectedInventoryItem(item);
+      setFormData({
+        nama_barang: item.nama_barang,
+        jumlah: 0,
+        kategori: item.kategori,
+        catatan: '',
+      });
+    } else {
+      setSelectedInventoryItem(null);
+      setFormData({
+        nama_barang: '',
+        jumlah: 0,
+        kategori: '',
+        catatan: '',
+      });
+    }
+  };
+
+  const handleEditItem = (index: number) => {
+    setEditingIndex(index);
+    setEditingItem({ ...notaData!.items[index] });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingIndex(null);
+    setEditingItem(null);
+  };
+
+  const handleSaveEdit = () => {
+    if (editingIndex === null || !editingItem || !notaData) return;
+    
+    const updatedItems = [...notaData.items];
+    updatedItems[editingIndex] = editingItem;
+    
+    setNotaData({
+      ...notaData,
+      items: updatedItems
+    });
+    
+    setEditingIndex(null);
+    setEditingItem(null);
+    toast.success('Item berhasil diupdate');
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Clean up previous preview URL
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    // Create preview URL
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
     setSelectedFile(file);
     toast.success('File berhasil dipilih');
   };
@@ -74,6 +168,14 @@ export default function InputBarangPage() {
       return;
     }
 
+    // Clean up previous preview URL
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+
+    // Create preview URL
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
     setSelectedFile(file);
     toast.success('File berhasil dipilih');
   };
@@ -121,28 +223,123 @@ export default function InputBarangPage() {
     }
 
     try {
-      // Save each item to inventory
-      const promises = notaData.items.map(item =>
-        fetch('/api/inventori', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            nama_barang: item.nama_barang,
-            jumlah: item.jumlah,
-            kategori: item.kategori,
-            catatan: `${item.satuan}${notaData.supplier ? ` - ${notaData.supplier}` : ''}`,
-          }),
-        })
-      );
+      // Fetch current inventory to check for existing items
+      const inventoryResponse = await fetch('/api/inventori');
+      const inventoryResult = await inventoryResponse.json();
+      const currentInventory: InventoryItem[] = inventoryResult.data || [];
 
-      await Promise.all(promises);
+      // Helper function to normalize string for comparison
+      const normalizeString = (str: string) => {
+        return str.toLowerCase()
+          .replace(/\s+/g, ' ')
+          .trim()
+          .replace(/[^\w\s]/g, ''); // Remove special characters
+      };
+
+      // Helper function to calculate similarity
+      const calculateSimilarity = (str1: string, str2: string) => {
+        const s1 = normalizeString(str1);
+        const s2 = normalizeString(str2);
+        
+        // Check if one contains the other
+        if (s1.includes(s2) || s2.includes(s1)) {
+          return 0.9; // High similarity
+        }
+        
+        // Check exact match
+        if (s1 === s2) {
+          return 1.0;
+        }
+        
+        // Calculate word overlap
+        const words1 = s1.split(' ');
+        const words2 = s2.split(' ');
+        const commonWords = words1.filter(word => words2.includes(word));
+        
+        if (commonWords.length > 0) {
+          const similarity = (commonWords.length * 2) / (words1.length + words2.length);
+          return similarity;
+        }
+        
+        return 0;
+      };
+
+      let created = 0;
+      let updated = 0;
+
+      // Process each item
+      for (const item of notaData.items) {
+        // Find similar item in inventory
+        let matchedItem: InventoryItem | null = null;
+        let highestSimilarity = 0;
+
+        for (const invItem of currentInventory) {
+          const similarity = calculateSimilarity(item.nama_barang, invItem.nama_barang);
+          if (similarity > 0.7 && similarity > highestSimilarity) { // 70% similarity threshold
+            highestSimilarity = similarity;
+            matchedItem = invItem;
+          }
+        }
+
+        if (matchedItem) {
+          // Update existing item (merge)
+          const newJumlah = matchedItem.jumlah + item.jumlah;
+          const timestamp = new Date().toISOString();
+          const logEntry = `MASUK|${timestamp}|+${item.jumlah}${item.satuan ? ' ' + item.satuan : ''}${notaData.supplier ? ' dari ' + notaData.supplier : ''}`;
+          
+          const response = await fetch('/api/inventori', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: matchedItem.id,
+              nama_barang: matchedItem.nama_barang,
+              jumlah: newJumlah,
+              kategori: item.kategori || matchedItem.kategori,
+              catatan: `${matchedItem.catatan || ''}${matchedItem.catatan ? ' | ' : ''}${logEntry}`,
+            }),
+          });
+
+          if (response.ok) {
+            updated++;
+          }
+        } else {
+          // Create new item
+          const timestamp = new Date().toISOString();
+          const logEntry = `MASUK|${timestamp}|+${item.jumlah}${item.satuan ? ' ' + item.satuan : ''}${notaData.supplier ? ' dari ' + notaData.supplier : ''}`;
+          
+          const response = await fetch('/api/inventori', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              nama_barang: item.nama_barang,
+              jumlah: item.jumlah,
+              kategori: item.kategori,
+              catatan: logEntry,
+            }),
+          });
+
+          if (response.ok) {
+            created++;
+          }
+        }
+      }
       
-      toast.success(`Berhasil menyimpan ${notaData.items.length} item ke inventori!`);
+      const message = [];
+      if (created > 0) message.push(`${created} item baru`);
+      if (updated > 0) message.push(`${updated} item diupdate (merged)`);
       
-      // Reset
+      toast.success(`Berhasil menyimpan! ${message.join(', ')}`);
+      
+      // Reset and refresh
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      setPreviewUrl(null);
       setSelectedFile(null);
       setNotaData(null);
+      fetchInventoryItems();
     } catch (error) {
+      console.error('Error saving to inventory:', error);
       toast.error('Gagal menyimpan data ke inventori');
     }
   };
@@ -150,22 +347,54 @@ export default function InputBarangPage() {
   const handleBarangKeluarSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!selectedInventoryItem) {
+      toast.error('Pilih barang terlebih dahulu');
+      return;
+    }
+
     if (!formData.nama_barang || formData.jumlah <= 0) {
-      toast.error('Nama barang dan jumlah harus diisi');
+      toast.error('Jumlah harus lebih dari 0');
+      return;
+    }
+
+    if (formData.jumlah > selectedInventoryItem.jumlah) {
+      toast.error(`Jumlah tidak boleh melebihi stok tersedia (${selectedInventoryItem.jumlah})`);
       return;
     }
 
     try {
-      // TODO: Implement API call for barang keluar
-      toast.success('Barang keluar berhasil dicatat');
+      // Update inventory: reduce stock
+      const newJumlah = selectedInventoryItem.jumlah - formData.jumlah;
+      const timestamp = new Date().toISOString();
+      const logEntry = `KELUAR|${timestamp}|-${formData.jumlah}${formData.catatan ? ' - ' + formData.catatan : ''}`;
       
-      // Reset form
+      const response = await fetch('/api/inventori', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedInventoryItem.id,
+          nama_barang: selectedInventoryItem.nama_barang,
+          jumlah: newJumlah,
+          kategori: selectedInventoryItem.kategori,
+          catatan: `${selectedInventoryItem.catatan || ''}${selectedInventoryItem.catatan ? ' | ' : ''}${logEntry}`,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Gagal mengupdate stok');
+      }
+
+      toast.success(`Berhasil! Stok ${formData.nama_barang} berkurang ${formData.jumlah}. Sisa: ${newJumlah}`);
+      
+      // Reset form and refresh inventory
       setFormData({
         nama_barang: '',
         jumlah: 0,
         kategori: '',
         catatan: '',
       });
+      setSelectedInventoryItem(null);
+      fetchInventoryItems();
     } catch (error) {
       toast.error('Gagal mencatat barang keluar');
     }
@@ -262,6 +491,36 @@ export default function InputBarangPage() {
               </label>
             </div>
 
+            {/* Preview Image */}
+            {selectedFile && previewUrl && selectedFile.type.startsWith('image/') && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-6 bg-gray-50 rounded-xl p-4"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-700">Preview Nota</h3>
+                  <button
+                    onClick={() => {
+                      setSelectedFile(null);
+                      setPreviewUrl(null);
+                      setNotaData(null);
+                    }}
+                    className="text-sm text-red-600 hover:text-red-700 font-medium"
+                  >
+                    Hapus
+                  </button>
+                </div>
+                <div className="relative bg-white rounded-lg overflow-hidden border border-gray-200">
+                  <img
+                    src={previewUrl}
+                    alt="Preview nota"
+                    className="w-full h-auto max-h-96 object-contain"
+                  />
+                </div>
+              </motion.div>
+            )}
+
             {selectedFile && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
@@ -320,25 +579,115 @@ export default function InputBarangPage() {
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Harga Satuan</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Total Harga</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Kategori</th>
+                        <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
                       {notaData.items.map((item, idx) => (
                         <tr key={idx} className="border-b last:border-0">
-                          <td className="px-4 py-3 text-sm text-gray-900">{item.nama_barang}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900">{item.jumlah}</td>
-                          <td className="px-4 py-3 text-sm text-gray-900">{item.satuan}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {item.harga_satuan ? `Rp ${item.harga_satuan.toLocaleString('id-ID')}` : '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                            {item.harga_total ? `Rp ${item.harga_total.toLocaleString('id-ID')}` : '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
-                              {item.kategori}
-                            </span>
-                          </td>
+                          {editingIndex === idx && editingItem ? (
+                            <>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="text"
+                                  value={editingItem.nama_barang}
+                                  onChange={(e) => setEditingItem({ ...editingItem, nama_barang: e.target.value })}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="number"
+                                  value={editingItem.jumlah}
+                                  onChange={(e) => setEditingItem({ ...editingItem, jumlah: parseFloat(e.target.value) || 0 })}
+                                  className="w-20 px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="text"
+                                  value={editingItem.satuan}
+                                  onChange={(e) => setEditingItem({ ...editingItem, satuan: e.target.value })}
+                                  className="w-20 px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="text"
+                                  value={editingItem.harga_satuan || ''}
+                                  onChange={(e) => setEditingItem({ ...editingItem, harga_satuan: e.target.value })}
+                                  className="w-28 px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
+                                  placeholder="Rp 0"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="text"
+                                  value={editingItem.harga_total || ''}
+                                  onChange={(e) => setEditingItem({ ...editingItem, harga_total: e.target.value })}
+                                  className="w-32 px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
+                                  placeholder="Rp 0"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <select
+                                  value={editingItem.kategori}
+                                  onChange={(e) => setEditingItem({ ...editingItem, kategori: e.target.value })}
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-gray-900"
+                                >
+                                  <option value="Bahan Baku">Bahan Baku</option>
+                                  <option value="Kemasan">Kemasan</option>
+                                  <option value="Lainnya">Lainnya</option>
+                                </select>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex gap-2 justify-center">
+                                  <button
+                                    onClick={handleSaveEdit}
+                                    className="p-1.5 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                                    title="Simpan"
+                                  >
+                                    <Save className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={handleCancelEdit}
+                                    className="p-1.5 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                                    title="Batal"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-4 py-3 text-sm text-gray-900">{item.nama_barang}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">{item.jumlah}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">{item.satuan}</td>
+                              <td className="px-4 py-3 text-sm text-gray-900">
+                                {item.harga_satuan || '-'}
+                              </td>
+                              <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                                {item.harga_total || '-'}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-900">
+                                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                                  {item.kategori}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex justify-center">
+                                  <button
+                                    onClick={() => handleEditItem(idx)}
+                                    className="p-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                                    title="Edit"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -392,49 +741,76 @@ export default function InputBarangPage() {
             <form onSubmit={handleBarangKeluarSubmit} className="space-y-6">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Nama Barang *
+                  Pilih Barang *
                 </label>
-                <input
-                  type="text"
-                  value={formData.nama_barang}
-                  onChange={(e) => setFormData({ ...formData, nama_barang: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] focus:border-transparent"
-                  placeholder="Masukkan nama barang"
+                <select
+                  value={selectedInventoryItem?.id || ''}
+                  onChange={(e) => handleInventoryItemSelect(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] focus:border-transparent text-gray-900"
                   required
-                />
+                >
+                  <option value="">-- Pilih barang dari inventori --</option>
+                  {inventoryItems.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.nama_barang} (Stok: {item.jumlah})
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              {selectedInventoryItem && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Package className="w-5 h-5 text-blue-600" />
+                    <span className="font-semibold text-blue-900">Info Stok</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">Stok Tersedia:</span>
+                      <span className="ml-2 font-bold text-blue-900">{selectedInventoryItem.jumlah}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Kategori:</span>
+                      <span className="ml-2 font-semibold text-blue-900">{selectedInventoryItem.kategori}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Jumlah *
+                    Jumlah Keluar *
                   </label>
                   <input
                     type="number"
                     value={formData.jumlah || ''}
                     onChange={(e) => setFormData({ ...formData, jumlah: parseInt(e.target.value) || 0 })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] focus:border-transparent text-gray-900"
                     placeholder="0"
                     min="1"
+                    max={selectedInventoryItem?.jumlah || undefined}
+                    disabled={!selectedInventoryItem}
                     required
                   />
+                  {selectedInventoryItem && formData.jumlah > selectedInventoryItem.jumlah && (
+                    <p className="mt-1 text-sm text-red-600">
+                      Jumlah tidak boleh melebihi stok tersedia ({selectedInventoryItem.jumlah})
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Kategori
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={formData.kategori}
-                    onChange={(e) => setFormData({ ...formData, kategori: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] focus:border-transparent"
-                  >
-                    <option value="">Pilih kategori</option>
-                    <option value="Bahan Baku">Bahan Baku</option>
-                    <option value="Kemasan">Kemasan</option>
-                    <option value="Peralatan">Peralatan</option>
-                    <option value="Lainnya">Lainnya</option>
-                  </select>
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-900"
+                    disabled
+                    readOnly
+                  />
                 </div>
               </div>
 
@@ -445,7 +821,7 @@ export default function InputBarangPage() {
                 <textarea
                   value={formData.catatan}
                   onChange={(e) => setFormData({ ...formData, catatan: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] focus:border-transparent text-gray-900"
                   placeholder="Tambahkan catatan (opsional)"
                   rows={3}
                 />
