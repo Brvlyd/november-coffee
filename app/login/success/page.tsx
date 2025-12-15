@@ -1,12 +1,13 @@
 'use client';
 
 import * as React from 'react';
+import { Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { Check } from 'lucide-react';
 
-export default function LoginSuccessPage() {
+function SuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const name = searchParams.get('name') || 'Karyawan';
@@ -63,5 +64,17 @@ export default function LoginSuccessPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+export default function LoginSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-gray-600">Loading...</div>
+      </div>
+    }>
+      <SuccessContent />
+    </Suspense>
   );
 }
