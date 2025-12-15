@@ -89,7 +89,7 @@ export default function PayrollPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Slip Gaji</h1>
-          <p className="text-gray-600 font-medium">Kelola data slip gaji karyawan November Coffee</p>
+          <p className="text-gray-600 font-medium">Kelola data slip gaji karyawan</p>
         </div>
       </div>
 

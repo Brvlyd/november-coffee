@@ -14,9 +14,9 @@ export default function Home() {
       <div className="absolute inset-0 bg-[#D9603B]" />
 
       {/* Layer 2: Photo with 60% opacity - Left Half */}
-      <div className="absolute inset-y-0 left-0 w-1/2">
+      <div className="absolute inset-y-0 left-0 w-2/3">
         <Image
-          src="/images/gallery/halaman_depan.jpeg"
+          src="/images/gallery/Merch.jpeg"
           alt="November Coffee"
           fill
           className="object-cover opacity-60"
@@ -43,14 +43,13 @@ export default function Home() {
           >
             {/* Logo Circle */}
             <div className="w-56 h-56 mx-auto bg-white rounded-full flex items-center justify-center shadow-2xl">
-              <div className="text-center">
-                <div className="text-[#D9603B] font-extrabold text-5xl leading-tight">
-                  November
-                </div>
-                <div className="text-[#D9603B] font-extrabold text-4xl leading-tight">
-                  Coffee
-                </div>
-              </div>
+              <Image
+                src="/images/gallery/november_logo.png"
+                alt="November Coffee Logo"
+                width={240}
+                height={240}
+                className="object-contain"
+              />
             </div>
           </motion.div>
 

@@ -24,7 +24,7 @@ export default function LoginSuccessPage() {
       {/* Background with photo */}
       <div className="absolute inset-0">
         <Image
-          src="/images/gallery/halaman_depan.jpeg"
+          src="/images/gallery/Merch.jpeg"
           alt="November Coffee"
           fill
           className="object-cover"

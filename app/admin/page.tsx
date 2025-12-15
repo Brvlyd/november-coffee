@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { getCurrentShift } from '@/lib/shift';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import Image from 'next/image';
 
 interface Stats {
   totalEmployees: number;
@@ -130,9 +131,10 @@ export default function ManagerDashboard() {
       const startDate = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0];
       const endDate = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0];
 
+      // Ambil data dengan check_in_at dan shift_id untuk hitung keterlambatan
       const { data: attendanceData } = await supabase
         .from('attendance')
-        .select('date, status, employee_id')
+        .select('date, status, employee_id, check_in_at, shift_id')
         .gte('date', startDate)
         .lte('date', endDate);
 
@@ -141,7 +143,7 @@ export default function ManagerDashboard() {
         .select('*', { count: 'exact', head: true })
         .neq('position', 'Admin');
 
-      // Group by date
+      // Group by date and calculate late status
       const dailyData: DailyAttendance = {};
       attendanceData?.forEach((record) => {
         const date = record.date;
@@ -149,11 +151,35 @@ export default function ManagerDashboard() {
           dailyData[date] = { total: 0, hadir: 0, terlambat: 0, absen: 0 };
         }
         dailyData[date].total++;
-        // Jika status adalah 'Hadir' atau null/belum check-out, hitung sebagai hadir
-        if (record.status === 'Hadir' || !record.status) {
+        
+        // Hitung keterlambatan jika status Hadir dan ada check_in_at
+        if (record.status === 'Hadir' && record.check_in_at) {
+          const checkInTime = new Date(record.check_in_at);
+          const checkInHour = checkInTime.getUTCHours() + 7; // Convert to WIB
+          const checkInMinute = checkInTime.getUTCMinutes();
+          const actualTimeInMinutes = (checkInHour % 24) * 60 + checkInMinute;
+          
+          let isLate = false;
+          if (record.shift_id === 1) { // Pagi 11:00
+            const startTime = 11 * 60;
+            isLate = actualTimeInMinutes > startTime + 5; // Terlambat jika > 11:05
+          } else if (record.shift_id === 2) { // Malam 19:00
+            const startTime = 19 * 60;
+            isLate = actualTimeInMinutes > startTime + 5; // Terlambat jika > 19:05
+          } else if (record.shift_id === 3) { // Dini Hari 03:00
+            const startTime = 3 * 60;
+            isLate = actualTimeInMinutes > startTime + 5; // Terlambat jika > 03:05
+          }
+          
+          if (isLate) {
+            dailyData[date].terlambat++;
+          } else {
+            dailyData[date].hadir++;
+          }
+        } else if (record.status === 'Hadir' || !record.status) {
+          // Jika tidak ada check_in_at, hitung sebagai hadir biasa
           dailyData[date].hadir++;
         }
-        // Logika terlambat akan dihitung dari check_in_at vs shift_id
       });
 
       // Calculate absen for each day
@@ -517,8 +543,19 @@ export default function ManagerDashboard() {
     <div className="p-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
-        <p className="text-gray-600">Selamat datang di November Coffee Manager Panel</p>
+        <div className="flex items-center gap-6 mb-4">
+          <Image
+            src="/images/gallery/november_logo.png"
+            alt="November Coffee Logo"
+            width={120}
+            height={120}
+            className="object-contain"
+          />
+          <div>
+            <h1 className="text-4xl font-bold text-gray-900">Dashboard</h1>
+            <p className="text-gray-600 mt-2">Selamat datang di Manager Panel</p>
+          </div>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">

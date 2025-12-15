@@ -25,19 +25,10 @@ export async function POST(request: NextRequest) {
     ocrFormData.append('detectCheckbox', 'false'); // Speed up processing
 
     // Call OCR.space API
-    const apiKey = process.env.OCR_SPACE_API_KEY;
-    
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'OCR API key tidak dikonfigurasi' },
-        { status: 500 }
-      );
-    }
-    
     const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
       method: 'POST',
       headers: {
-        'apikey': apiKey,
+        'apikey': process.env.OCR_SPACE_API_KEY || 'K81729156788957',
       },
       body: ocrFormData,
     });

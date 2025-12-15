@@ -6,8 +6,7 @@ export async function POST(request: NextRequest) {
   try {
     const { employeeId, password } = await request.json();
 
-    // Log login attempt without sensitive data
-    console.log('Login attempt for employee:', employeeId);
+    console.log('Login attempt:', { employeeId, password: password ? '***' : 'empty' });
 
     if (!employeeId || !password) {
       return NextResponse.json(

@@ -135,7 +135,7 @@ export default function LoginPage() {
       {/* Background with photo */}
       <div className="absolute inset-0">
         <Image
-          src="/images/gallery/View3.jpeg"
+          src="/images/gallery/Indoor4.jpeg"
           alt="November Coffee"
           fill
           className="object-cover"
@@ -200,14 +200,13 @@ export default function LoginPage() {
             className="flex justify-center mb-8 mt-20"
           >
             <div className="w-48 h-48 bg-white rounded-full flex items-center justify-center shadow-xl">
-              <div className="text-center">
-                <div className="text-[#D9603B] font-extrabold text-3xl leading-tight">
-                  November
-                </div>
-                <div className="text-[#D9603B] font-extrabold text-2xl leading-tight">
-                  Coffee
-                </div>
-              </div>
+              <Image
+                src="/images/gallery/november_logo.png"
+                alt="November Coffee Logo"
+                width={200}
+                height={200}
+                className="object-contain"
+              />
             </div>
           </motion.div>
 

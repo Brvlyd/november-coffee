@@ -4,6 +4,7 @@ import * as React from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { 
   LayoutDashboard, 
   Users, 
@@ -104,17 +105,16 @@ export default function ManagerLayout({
         }`}
       >
         {/* Logo Section */}
-        <div className="p-6 border-b border-white/10">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform">
-              <div className="text-center">
-                <div className="text-[#C84B31] font-bold text-sm leading-tight">Nov.</div>
-                <div className="text-[#C84B31] font-bold text-sm leading-tight">Coffee</div>
-              </div>
-            </div>
-            <div>
-              <h1 className="text-white font-bold text-xl">November</h1>
-              <p className="text-white/70 text-sm">Manager Panel</p>
+        <div className="p-4 border-b border-white/10">
+          <div className="flex items-center justify-center">
+            <div className="bg-white rounded-full p-4 shadow-lg">
+              <Image
+                src="/images/gallery/november_logo.png"
+                alt="Logo"
+                width={180}
+                height={180}
+                className="object-contain"
+              />
             </div>
           </div>
         </div>

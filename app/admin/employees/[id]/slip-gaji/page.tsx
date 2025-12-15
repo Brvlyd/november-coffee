@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Download, Calendar, DollarSign, User, Clock, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import Image from 'next/image';
 
 interface Employee {
   id: string;
@@ -296,8 +297,16 @@ Dicetak pada: ${new Date().toLocaleString('id-ID')}
           {/* Header Section */}
           <div className="bg-gradient-to-r from-[#E07856] to-[#D96846] p-8 text-white">
             <div className="text-center mb-6">
-              <h2 className="text-3xl font-bold mb-2">NOVEMBER COFFEE</h2>
-              <p className="text-white/90 text-lg">Slip Gaji Karyawan</p>
+              <div className="flex justify-center mb-3">
+                <Image
+                  src="/images/gallery/november_logo.png"
+                  alt="Logo"
+                  width={120}
+                  height={120}
+                  className="object-contain bg-white rounded-full p-2"
+                />
+              </div>
+              <p className="text-white text-lg font-semibold">Slip Gaji Karyawan</p>
             </div>
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
               <p className="text-sm text-white/80 mb-1">Periode Pembayaran</p>
