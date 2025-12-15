@@ -127,7 +127,10 @@ export default function AdminDashboard() {
           dailyData[date] = { total: 0, hadir: 0, izin: 0, absen: 0 };
         }
         dailyData[date].total++;
-        if (record.status === 'Hadir') dailyData[date].hadir++;
+        // Jika status adalah 'Hadir' atau null/belum check-out, hitung sebagai hadir
+        if (record.status === 'Hadir' || !record.status) {
+          dailyData[date].hadir++;
+        }
         if (record.status === 'Izin') dailyData[date].izin++;
       });
 
@@ -163,22 +166,53 @@ export default function AdminDashboard() {
 
   const handleDateClick = (day: number | null) => {
     if (!day) return;
-    const dateStr = new Date(selectedYear, selectedMonth, day).toISOString().split('T')[0];
+    // Format tanggal dengan padding zero untuk konsistensi
+    const year = selectedYear;
+    const month = String(selectedMonth + 1).padStart(2, '0');
+    const dayStr = String(day).padStart(2, '0');
+    const dateStr = `${year}-${month}-${dayStr}`;
     router.push(`/admin/attendance?date=${dateStr}`);
   };
 
   const getDateColor = (day: number | null) => {
     if (!day) return '';
-    const dateStr = new Date(selectedYear, selectedMonth, day).toISOString().split('T')[0];
+    // Format tanggal dengan padding zero untuk konsistensi
+    const year = selectedYear;
+    const month = String(selectedMonth + 1).padStart(2, '0');
+    const dayStr = String(day).padStart(2, '0');
+    const dateStr = `${year}-${month}-${dayStr}`;
     const dayData = dailyAttendance[dateStr];
     
-    if (!dayData) return 'bg-gray-50 hover:bg-gray-100';
-
-    const attendanceRate = (dayData.hadir / (dayData.hadir + dayData.izin + dayData.absen)) * 100;
+    // Cek apakah tanggal sudah lewat atau hari ini (tanpa timezone issue)
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     
-    if (attendanceRate >= 80) return 'bg-green-100 hover:bg-green-200 border border-green-300';
-    if (attendanceRate >= 50) return 'bg-yellow-100 hover:bg-yellow-200 border border-yellow-300';
-    return 'bg-red-100 hover:bg-red-200 border border-red-300';
+    // Jika tidak ada data
+    if (!dayData) {
+      // Jika tanggal belum terjadi (masa depan), tampilkan abu-abu
+      if (dateStr > todayStr) {
+        return 'bg-gray-50 hover:bg-gray-100';
+      }
+      // Jika hari ini atau masa lalu tanpa data, berarti tidak ada yang absen (0 orang) -> merah
+      return 'bg-red-100 hover:bg-red-200 border border-red-300';
+    }
+
+    // Total karyawan yang hadir atau izin (yang tercatat absensi)
+    const totalAttendance = dayData.hadir + dayData.izin;
+    
+    // Jika hanya 0, 1, atau 2 pegawai yang hadir/izin, langsung merah
+    if (totalAttendance <= 2) return 'bg-red-100 hover:bg-red-200 border border-red-300';
+    
+    // Gunakan nilai tengah dari total karyawan (non-admin)
+    const totalEmployees = stats.totalEmployees;
+    const midpoint = totalEmployees / 2;
+    
+    // Jika di atas nilai tengah -> hijau
+    if (totalAttendance > midpoint) return 'bg-green-100 hover:bg-green-200 border border-green-300';
+    // Jika di bawah nilai tengah -> merah
+    if (totalAttendance < midpoint) return 'bg-red-100 hover:bg-red-200 border border-red-300';
+    // Jika tepat di tengah -> kuning
+    return 'bg-yellow-100 hover:bg-yellow-200 border border-yellow-300';
   };
 
   const isToday = (day: number | null) => {
@@ -566,8 +600,7 @@ export default function AdminDashboard() {
             {/* Calendar Days */}
             <div className="grid grid-cols-7 gap-1">
               {calendarDays.map((day, index) => {
-                const dateStr = day ? new Date(selectedYear, selectedMonth, day).toISOString().split('T')[0] : '';
-                const dayData = day ? dailyAttendance[dateStr] : null;
+                const baseColor = getDateColor(day);
                 
                 return (
                   <motion.button
@@ -580,22 +613,16 @@ export default function AdminDashboard() {
                       relative aspect-square flex flex-col items-center justify-center text-sm rounded-lg
                       transition-all cursor-pointer
                       ${!day ? 'invisible' : ''}
-                      ${isToday(day)
-                        ? 'bg-[#C84B31] text-white font-bold shadow-md ring-2 ring-[#D9603B]' 
-                        : getDateColor(day) + ' text-gray-700'
+                      ${baseColor}
+                      ${isToday(day) 
+                        ? 'ring-4 ring-[#C84B31] ring-offset-2 font-bold' 
+                        : 'text-gray-700'
                       }
-                      ${day && !isToday(day) ? 'hover:shadow-md' : ''}
+                      ${day ? 'hover:shadow-md' : ''}
                     `}
                   >
                     {day && (
-                      <>
-                        <span className="font-semibold">{day}</span>
-                        {dayData && (
-                          <span className="text-[10px] font-medium mt-0.5 opacity-75">
-                            {dayData.hadir}/{dayData.hadir + dayData.izin + dayData.absen}
-                          </span>
-                        )}
-                      </>
+                      <span className={`font-semibold ${isToday(day) ? 'text-gray-900' : ''}`}>{day}</span>
                     )}
                   </motion.button>
                 );

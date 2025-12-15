@@ -12,7 +12,10 @@ import {
   LogOut,
   Menu,
   X,
-  DollarSign
+  DollarSign,
+  ChevronDown,
+  Upload,
+  BarChart3
 } from 'lucide-react';
 
 const menuItems = [
@@ -30,6 +33,18 @@ const menuItems = [
     href: '/admin/inventori',
     icon: Package,
     label: 'Inventori',
+    submenu: [
+      {
+        href: '/admin/inventori/input-barang',
+        icon: Upload,
+        label: 'Input Barang',
+      },
+      {
+        href: '/admin/inventori/monitoring-stok',
+        icon: BarChart3,
+        label: 'Monitoring Stok',
+      },
+    ],
   },
   {
     href: '/admin/attendance',
@@ -51,10 +66,23 @@ export default function AdminLayout({
   const pathname = usePathname();
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+  const [openSubmenu, setOpenSubmenu] = React.useState<string | null>(null);
 
   const handleLogout = () => {
     router.push('/');
   };
+
+  React.useEffect(() => {
+    // Auto open submenu if current path is in submenu
+    menuItems.forEach((item) => {
+      if (item.submenu) {
+        const isSubmenuActive = item.submenu.some(sub => pathname.startsWith(sub.href));
+        if (isSubmenuActive) {
+          setOpenSubmenu(item.href);
+        }
+      }
+    });
+  }, [pathname]);
 
   return (
     <div className="h-screen bg-gray-100 flex overflow-hidden" suppressHydrationWarning>
@@ -100,24 +128,77 @@ export default function AdminLayout({
         <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
+            const hasSubmenu = item.submenu && item.submenu.length > 0;
+            const isSubmenuOpen = openSubmenu === item.href;
             const Icon = item.icon;
 
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setIsSidebarOpen(false)}
-                className={`
-                  group flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-200
-                  ${isActive 
-                    ? 'bg-white text-[#C84B31] shadow-lg font-semibold scale-[1.02]' 
-                    : 'text-white hover:bg-white/15 hover:translate-x-1'
-                  }
-                `}
-              >
-                <Icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? 'text-[#C84B31]' : 'text-white/90'}`} />
-                <span className="text-[15px]">{item.label}</span>
-              </Link>
+              <div key={item.href}>
+                {hasSubmenu ? (
+                  <button
+                    onClick={() => setOpenSubmenu(isSubmenuOpen ? null : item.href)}
+                    className={`
+                      group flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-200 w-full
+                      ${isSubmenuOpen || pathname.startsWith(item.href + '/')
+                        ? 'bg-white text-[#C84B31] shadow-lg font-semibold' 
+                        : 'text-white hover:bg-white/15'
+                      }
+                    `}
+                  >
+                    <Icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${isSubmenuOpen || pathname.startsWith(item.href + '/') ? 'text-[#C84B31]' : 'text-white/90'}`} />
+                    <span className="text-[15px] flex-1 text-left">{item.label}</span>
+                    <ChevronDown className={`w-4 h-4 transition-transform ${isSubmenuOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                ) : (
+                  <Link
+                    href={item.href}
+                    onClick={() => setIsSidebarOpen(false)}
+                    className={`
+                      group flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-200
+                      ${isActive 
+                        ? 'bg-white text-[#C84B31] shadow-lg font-semibold scale-[1.02]' 
+                        : 'text-white hover:bg-white/15 hover:translate-x-1'
+                      }
+                    `}
+                  >
+                    <Icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${isActive ? 'text-[#C84B31]' : 'text-white/90'}`} />
+                    <span className="text-[15px]">{item.label}</span>
+                  </Link>
+                )}
+
+                {/* Submenu */}
+                {hasSubmenu && isSubmenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mt-1 ml-4 space-y-1"
+                  >
+                    {item.submenu!.map((subItem) => {
+                      const isSubActive = pathname === subItem.href;
+                      const SubIcon = subItem.icon;
+
+                      return (
+                        <Link
+                          key={subItem.href}
+                          href={subItem.href}
+                          onClick={() => setIsSidebarOpen(false)}
+                          className={`
+                            group flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200
+                            ${isSubActive 
+                              ? 'bg-white/90 text-[#C84B31] font-semibold' 
+                              : 'text-white/80 hover:bg-white/10 hover:text-white'
+                            }
+                          `}
+                        >
+                          <SubIcon className={`w-4 h-4 ${isSubActive ? 'text-[#C84B31]' : 'text-white/70'}`} />
+                          <span className="text-sm">{subItem.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </motion.div>
+                )}
+              </div>
             );
           })}
         </nav>

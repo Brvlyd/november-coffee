@@ -94,15 +94,13 @@ export default function LoginPage() {
           throw new Error('Check-out gagal');
         }
 
-        // Show goodbye popup after 3 seconds
+        // Show goodbye popup immediately
+        setWelcomeName(authData.employeeName);
+        setShowWelcome(true);
+        setIsCheckout(true);
+        
         setTimeout(() => {
-          setWelcomeName(authData.employeeName);
-          setShowWelcome(true);
-          setIsCheckout(true);
-          
-          setTimeout(() => {
-            router.push('/');
-          }, 3000);
+          router.push('/');
         }, 3000);
       } else {
         // Check-in flow
@@ -117,14 +115,12 @@ export default function LoginPage() {
           throw new Error(errorData.error || 'Check-in gagal');
         }
 
-        // Show welcome popup after 3 seconds
+        // Show welcome popup immediately
+        setWelcomeName(authData.employeeName);
+        setShowWelcome(true);
+        
         setTimeout(() => {
-          setWelcomeName(authData.employeeName);
-          setShowWelcome(true);
-          
-          setTimeout(() => {
-            router.push('/');
-          }, 3000);
+          router.push('/');
         }, 3000);
       }
     } catch (error: any) {

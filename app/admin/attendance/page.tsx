@@ -5,6 +5,8 @@ import { motion } from 'framer-motion';
 import { Calendar, Download, Search } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { formatDate, formatTime, calculateDuration } from '@/lib/utils';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
 interface AttendanceRecord {
   id: string;
@@ -16,18 +18,78 @@ interface AttendanceRecord {
   duration: string | null;
 }
 
-export default function AttendancePage() {
+function AttendanceContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
   const [attendance, setAttendance] = React.useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [dateFilter, setDateFilter] = React.useState('');
+  const [dateInput, setDateInput] = React.useState('');
 
+  // Update filter dari URL params dan fetch data
   React.useEffect(() => {
-    fetchAttendance();
+    const dateParam = searchParams.get('date') || '';
+    setDateFilter(dateParam);
+    setDateInput(dateParam);
+    
+    // Fetch data dengan parameter baru
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const url = dateParam 
+          ? `/api/attendance?date=${dateParam}`
+          : '/api/attendance';
+        
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (response.ok) {
+          if (result.data && Array.isArray(result.data)) {
+            const transformedData = result.data.map((record: any) => ({
+              id: record.id,
+              employee_id: record.employees?.employee_id || record.employee_id,
+              employee_name: record.employees?.full_name || 'Unknown',
+              date: record.date,
+              check_in_at: record.check_in_at,
+              check_out_at: record.check_out_at,
+              duration: record.check_out_at 
+                ? calculateDuration(new Date(record.check_in_at), new Date(record.check_out_at))
+                : null
+            }));
+            setAttendance(transformedData);
+          } else {
+            setAttendance([]);
+          }
+        } else {
+          toast.error(result.error || 'Gagal mengambil data');
+          setAttendance([]);
+        }
+      } catch (error) {
+        console.error('Error fetching attendance:', error);
+        toast.error('Gagal mengambil data absensi');
+        setAttendance([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [searchParams]);
+
+  // Fetch saat user ubah filter manual (bukan dari URL)
+  React.useEffect(() => {
+    // Hanya fetch jika dateFilter berbeda dari URL param (user ubah manual)
+    const urlDateParam = searchParams.get('date') || '';
+    if (dateFilter !== urlDateParam && !loading) {
+      fetchAttendance();
+    }
   }, [dateFilter]);
 
   const fetchAttendance = async () => {
     try {
+      setLoading(true);
       const url = dateFilter 
         ? `/api/attendance?date=${dateFilter}`
         : '/api/attendance';
@@ -36,24 +98,32 @@ export default function AttendancePage() {
       const result = await response.json();
       
       if (response.ok) {
-        // Transform data to match interface
-        const transformedData = result.data.map((record: any) => ({
-          id: record.id,
-          employee_id: record.employees?.employee_id || record.employee_id,
-          employee_name: record.employees?.full_name || 'Unknown',
-          date: record.date,
-          check_in_at: record.check_in_at,
-          check_out_at: record.check_out_at,
-          duration: record.check_out_at 
-            ? calculateDuration(new Date(record.check_in_at), new Date(record.check_out_at))
-            : null
-        }));
-        setAttendance(transformedData);
+        // Pastikan result.data ada dan merupakan array
+        if (result.data && Array.isArray(result.data)) {
+          const transformedData = result.data.map((record: any) => ({
+            id: record.id,
+            employee_id: record.employees?.employee_id || record.employee_id,
+            employee_name: record.employees?.full_name || 'Unknown',
+            date: record.date,
+            check_in_at: record.check_in_at,
+            check_out_at: record.check_out_at,
+            duration: record.check_out_at 
+              ? calculateDuration(new Date(record.check_in_at), new Date(record.check_out_at))
+              : null
+          }));
+          setAttendance(transformedData);
+        } else {
+          // Jika tidak ada data, set array kosong
+          setAttendance([]);
+        }
       } else {
-        toast.error(result.error);
+        toast.error(result.error || 'Gagal mengambil data');
+        setAttendance([]); // Reset data jika error
       }
     } catch (error) {
+      console.error('Error fetching attendance:', error);
       toast.error('Gagal mengambil data absensi');
+      setAttendance([]); // Reset data jika error
     } finally {
       setLoading(false);
     }
@@ -154,8 +224,14 @@ export default function AttendancePage() {
             <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="date"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
+              value={dateInput}
+              onChange={(e) => setDateInput(e.target.value)}
+              onBlur={(e) => setDateFilter(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setDateFilter(dateInput);
+                }
+              }}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#C84B31] focus:border-transparent"
             />
           </div>
@@ -220,5 +296,17 @@ export default function AttendancePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AttendancePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-gray-600">Loading...</div>
+      </div>
+    }>
+      <AttendanceContent />
+    </Suspense>
   );
 }
