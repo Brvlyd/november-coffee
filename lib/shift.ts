@@ -33,8 +33,10 @@ export const SHIFTS: Shift[] = [
 
 export function getCurrentShift(): Shift {
   const now = new Date();
-  const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
+  // Konversi ke WIB (UTC+7)
+  const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+  const currentHour = wibTime.getUTCHours();
+  const currentMinute = wibTime.getUTCMinutes();
   const currentTimeInMinutes = currentHour * 60 + currentMinute;
 
   // Shift 1: 11:00 - 19:00 (660 - 1140 minutes)
