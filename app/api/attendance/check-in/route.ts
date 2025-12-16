@@ -41,45 +41,20 @@ export async function POST(request: NextRequest) {
     const today = wibTime.toISOString().split('T')[0];
     const currentShift = getCurrentShift();
 
+    console.log('=== SHIFT INFO ===');
     console.log('Current shift:', currentShift);
+    console.log('WIB Time:', wibTime.toISOString());
+    console.log('WIB Hours:', wibTime.getUTCHours(), 'Minutes:', wibTime.getUTCMinutes());
 
-    // Validasi waktu check-in: pegawai bisa check-in 10 menit sebelum shift dimulai
+    // ✅ PERUBAHAN: Izinkan check-in kapan saja dalam window shift
+    // Karyawan yang telat TETAP BISA check-in, system akan catat keterlambatan
+    // Tidak ada validasi waktu check-in yang ketat - lebih fleksibel untuk operasional
+    
     const currentHour = wibTime.getUTCHours();
     const currentMinute = wibTime.getUTCMinutes();
     const currentTimeInMinutes = currentHour * 60 + currentMinute;
-
-    // Parse shift start time
-    const [shiftStartHour, shiftStartMinute] = currentShift.startTime.split(':').map(Number);
-    const shiftStartTimeInMinutes = shiftStartHour * 60 + shiftStartMinute;
-
-    // Cek apakah waktu sekarang minimal 10 menit sebelum shift dimulai
-    // Pegawai bisa check-in dari 10 menit sebelum shift dimulai
-    const earliestCheckInTime = shiftStartTimeInMinutes - 10;
     
-    // Handle case untuk shift yang melewati tengah malam
-    let canCheckIn = false;
-    if (currentShift.id === 2) { // Shift Malam 19:00 - 03:00
-      // Bisa check-in mulai 18:50 (19:00 - 10 menit)
-      canCheckIn = currentTimeInMinutes >= earliestCheckInTime || currentTimeInMinutes < 180; // sampai 03:00
-    } else if (currentShift.id === 3) { // Shift Dini Hari 03:00 - 11:00
-      // Bisa check-in mulai 02:50 (03:00 - 10 menit)
-      const lateNightStart = (3 * 60) - 10; // 02:50
-      canCheckIn = (currentTimeInMinutes >= lateNightStart && currentTimeInMinutes < 660) || 
-                   (currentTimeInMinutes >= (24 * 60 - 10)); // atau dari 23:50 malam sebelumnya
-    } else { // Shift Pagi 11:00 - 19:00
-      // Bisa check-in mulai 10:50 (11:00 - 10 menit) sampai sebelum shift Malam
-      canCheckIn = currentTimeInMinutes >= earliestCheckInTime && currentTimeInMinutes < 1140;
-    }
-
-    if (!canCheckIn) {
-      return NextResponse.json(
-        { 
-          error: `Anda hanya bisa check-in mulai 10 menit sebelum shift ${currentShift.name} dimulai (${currentShift.startTime}).`,
-          shift: currentShift
-        },
-        { status: 400 }
-      );
-    }
+    console.log('Current time in minutes:', currentTimeInMinutes);
 
     // Check if employee has already checked in for this shift today
     const { data: existingShiftAttendance, error: shiftCheckError } = await supabase

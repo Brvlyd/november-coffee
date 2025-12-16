@@ -21,7 +21,9 @@ export default function LoginPage() {
   React.useEffect(() => {
     // Update shift info every minute
     const interval = setInterval(() => {
-      setCurrentShift(getCurrentShift());
+      const newShift = getCurrentShift();
+      console.log('Current Shift Update:', newShift);
+      setCurrentShift(newShift);
     }, 60000);
 
     return () => clearInterval(interval);
