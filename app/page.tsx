@@ -46,9 +46,9 @@ export default function Home() {
               <Image
                 src="/images/gallery/november_logo.png"
                 alt="November Coffee Logo"
-                width={240}
-                height={240}
-                className="object-contain"
+                width={256}
+                height={256}
+                className="object-cover w-80 h-80 pt-3 rounded-full"
               />
             </div>
           </motion.div>
@@ -57,7 +57,9 @@ export default function Home() {
           <motion.button
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => router.push('/login')}
             className="bg-white text-[#D9603B] px-24 py-5 rounded-lg font-bold text-3xl hover:bg-gray-50 transition-all duration-300 shadow-lg hover:shadow-xl"
           >

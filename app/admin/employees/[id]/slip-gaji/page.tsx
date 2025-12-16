@@ -24,6 +24,8 @@ interface AttendanceRecord {
   check_out_at: string | null;
   status: string;
   shift_id: number;
+  auto_checkout?: boolean;
+  notes?: string;
 }
 
 interface WeeklyData {
@@ -408,6 +410,9 @@ Dicetak pada: ${new Date().toLocaleString('id-ID')}
                     <div>
                       <p className="font-bold text-gray-900">{getDayName(record.date)}</p>
                       <p className="text-sm text-gray-600">{formatDate(record.date)}</p>
+                      {record.auto_checkout && (
+                        <p className="text-xs text-orange-600 font-semibold mt-1">⚡ Auto Checkout</p>
+                      )}
                     </div>
                     <div className="flex items-center gap-4 text-sm">
                       <div>
@@ -417,6 +422,9 @@ Dicetak pada: ${new Date().toLocaleString('id-ID')}
                       <div>
                         <span className="text-gray-600 font-semibold">Keluar: </span>
                         <span className="text-gray-900 font-bold">{formatTime(record.check_out_at)}</span>
+                        {record.auto_checkout && (
+                          <span className="ml-1 text-xs text-orange-600">⚡</span>
+                        )}
                       </div>
                     </div>
                   </div>

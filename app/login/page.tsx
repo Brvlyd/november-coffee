@@ -191,21 +191,21 @@ export default function LoginPage() {
       )}
 
       {/* Content */}
-      <div className="relative h-auto flex items-center justify-center p-4">
-        <div className="w-full max-w-6xl">
+      <div className="relative min-h-screen flex items-center justify-center">
+        <div className="w-full max-w-4xl">
           {/* Logo - Terpisah */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex justify-center mb-8 mt-20"
+            className="flex justify-center mb-0 relative z-20 -mt-6"
           >
-            <div className="w-48 h-48 bg-white rounded-full flex items-center justify-center shadow-xl">
+            <div className="w-56 h-56 bg-white rounded-full flex items-center justify-center p-0 overflow-visible">
               <Image
                 src="/images/gallery/november_logo.png"
                 alt="November Coffee Logo"
-                width={200}
-                height={200}
-                className="object-contain"
+                width={256}
+                height={256}
+                className="object-cover w-80 h-80 rounded-full"
               />
             </div>
           </motion.div>
@@ -215,25 +215,25 @@ export default function LoginPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="bg-white rounded-3xl shadow-2xl px-24 py-28 -mt-36"
+            className="bg-white rounded-3xl shadow-2xl px-16 pt-20 pb-12 -mt-20 relative z-10"
           >
-            <h2 className="text-[#D9603B] text-4xl font-bold text-center mt-4 mb-5">Login</h2>
+            <h2 className="text-[#D9603B] text-3xl font-bold text-center mb-6">Login</h2>
             
             {/* Shift Info Badge */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.3 }}
-              className="bg-gradient-to-r from-[#D9603B] to-[#C84B31] text-white px-6 py-3 rounded-xl text-center mb-12 shadow-lg"
+              className="bg-gradient-to-r from-[#D9603B] to-[#C84B31] text-white px-5 py-2 rounded-xl text-center mb-8 shadow-lg"
             >
-              <p className="font-bold text-lg">
+              <p className="font-bold text-base">
                 🕐 {currentShift.label}
               </p>
             </motion.div>
             
-            <div className="space-y-12">
-              <div className="flex items-center gap-4">
-                <label className="text-[#D9603B] font-semibold whitespace-nowrap w-32">
+            <div className="space-y-8">
+              <div className="flex items-center gap-3">
+                <label className="text-[#D9603B] font-semibold whitespace-nowrap w-28">
                   ID Karyawan
                 </label>
                 <div className="flex items-center gap-2 flex-1">
@@ -242,14 +242,14 @@ export default function LoginPage() {
                     type="text"
                     value={employeeId}
                     onChange={(e) => setEmployeeId(e.target.value)}
-                    className="flex-1 px-4 py-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D9603B] focus:border-transparent text-gray-900 font-medium"
+                    className="flex-1 px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D9603B] focus:border-transparent text-gray-900 font-medium"
                     disabled={isLoading}
                   />
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
-                <label className="text-[#D9603B] font-semibold whitespace-nowrap w-32">
+              <div className="flex items-center gap-3">
+                <label className="text-[#D9603B] font-semibold whitespace-nowrap w-28">
                   Password
                 </label>
                 <div className="flex items-center gap-2 flex-1">
@@ -258,24 +258,24 @@ export default function LoginPage() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="flex-1 px-4 py-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D9603B] focus:border-transparent text-gray-900 font-medium"
+                    className="flex-1 px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D9603B] focus:border-transparent text-gray-900 font-medium"
                     disabled={isLoading}
                   />
                 </div>
               </div>
 
-              <div className="flex justify-center gap-4 pt-6">
+              <div className="flex justify-center gap-3 pt-4">
                 <button
                   onClick={(e) => handleSubmit(e, 'checkin')}
                   disabled={isLoading}
-                  className="bg-gradient-to-r from-green-500 to-green-600 text-white px-12 py-4 rounded-lg font-bold text-lg hover:from-green-600 hover:to-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+                  className="bg-gradient-to-r from-green-500 to-green-600 text-white px-8 py-3 rounded-lg font-bold text-base hover:from-green-600 hover:to-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
                 >
                   {isLoading && actionType === 'checkin' ? 'Loading...' : '🟢 Check In'}
                 </button>
                 <button
                   onClick={(e) => handleSubmit(e, 'checkout')}
                   disabled={isLoading}
-                  className="bg-gradient-to-r from-red-500 to-red-600 text-white px-12 py-4 rounded-lg font-bold text-lg hover:from-red-600 hover:to-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+                  className="bg-gradient-to-r from-red-500 to-red-600 text-white px-8 py-3 rounded-lg font-bold text-base hover:from-red-600 hover:to-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
                 >
                   {isLoading && actionType === 'checkout' ? 'Loading...' : '🔴 Check Out'}
                 </button>

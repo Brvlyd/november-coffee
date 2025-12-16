@@ -12,6 +12,10 @@ const spartan = League_Spartan({
 export const metadata: Metadata = {
   title: "November Coffee - Sistem Absensi & Inventori",
   description: "Sistem manajemen absensi dan inventori untuk November Coffee",
+  icons: {
+    icon: "/images/gallery/november_logo.png",
+    apple: "/images/gallery/november_logo.png",
+  },
 };
 
 export default function RootLayout({
