@@ -60,7 +60,7 @@ CREATE INDEX idx_employees_employee_id ON employees(employee_id);
 
 -- Insert admin account
 INSERT INTO employees (employee_id, full_name, position, employment_status, email, password)
-VALUES ('admin', 'Administrator', 'Admin', 'Aktif', 'admin@novembercoffee.com', 'password');
+VALUES ('admin', 'Administrator', 'Admin', 'Aktif', 'admin@novembercoffee.com', 'mahasiswabinus');
 
 -- Insert sample employees (optional)
 INSERT INTO employees (employee_id, full_name, position, employment_status, email, password)
@@ -109,7 +109,7 @@ You should see the admin account.
 
 - **Admin**: 
   - ID: `admin`
-  - Password: `password`
+  - Password: `mahasiswabinus`
 
 - **Sample Employees**:
   - ID: `EMP001`, `EMP002`, `EMP003`
