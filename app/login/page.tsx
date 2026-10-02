@@ -282,6 +282,23 @@ export default function LoginPage() {
                   {isLoading && actionType === 'checkout' ? 'Loading...' : '🔴 Check Out'}
                 </button>
               </div>
+
+              {/* Demo Credentials */}
+              <div className="bg-orange-50 border border-[#D9603B]/30 rounded-xl px-5 py-4 text-sm text-gray-700">
+                <p className="text-[#D9603B] font-bold mb-2">🔑 Demo Credentials</p>
+                <div className="space-y-1">
+                  <p>
+                    <span className="font-semibold">Admin:</span>{' '}
+                    <code className="bg-white px-1.5 py-0.5 rounded">admin</code> /{' '}
+                    <code className="bg-white px-1.5 py-0.5 rounded">mahasiswabinus</code>
+                  </p>
+                  <p>
+                    <span className="font-semibold">Karyawan:</span>{' '}
+                    <code className="bg-white px-1.5 py-0.5 rounded">EMP001</code> /{' '}
+                    <code className="bg-white px-1.5 py-0.5 rounded">password123</code>
+                  </p>
+                </div>
+              </div>
             </div>
           </motion.div>
         </div>
