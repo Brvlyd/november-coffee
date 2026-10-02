@@ -290,7 +290,7 @@ export default function LoginPage() {
                   <p>
                     <span className="font-semibold">Admin:</span>{' '}
                     <code className="bg-white px-1.5 py-0.5 rounded">admin</code> /{' '}
-                    <code className="bg-white px-1.5 py-0.5 rounded">mahasiswabinus</code>
+                    <code className="bg-white px-1.5 py-0.5 rounded">password</code>
                   </p>
                   <p>
                     <span className="font-semibold">Karyawan:</span>{' '}

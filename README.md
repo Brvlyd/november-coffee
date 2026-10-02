@@ -149,7 +149,7 @@ Open [http://localhost:3000](http://localhost:3000)
 ### 👨‍💼 Admin Account
 ```
 ID: admin
-Password: mahasiswabinus
+Password: password
 ```
 
 ### 👤 Sample Employee (after database setup)
